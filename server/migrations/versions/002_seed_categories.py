@@ -1,7 +1,7 @@
 """Seed initial categories
 
 Revision ID: 002
-Revises: 001
+Revises: 
 Create Date: 2024-01-01 01:00:00.000000
 
 """
@@ -11,7 +11,7 @@ from datetime import datetime
 
 # revision identifiers, used by Alembic.
 revision = '002'
-down_revision = '001'
+down_revision = None
 branch_labels = None
 depends_on = None
 

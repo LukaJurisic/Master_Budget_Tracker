@@ -16,6 +16,7 @@ from .routes_analytics_simple import router as analytics_simple_router
 from .routes_analytics_freq import router as analytics_freq_router
 from .routes_dashboard import router as dashboard_router
 from .routes_search import router as search_router
+from .routes_balances import router as balances_router
 from .deps import get_database
 
 api_router = APIRouter()
@@ -36,6 +37,7 @@ api_router.include_router(analytics_freq_router, prefix="/analytics", tags=["ana
 api_router.include_router(analytics_simple_router, prefix="/analytics", tags=["analytics-simple"])
 api_router.include_router(dashboard_router, prefix="/dashboard", tags=["dashboard"])
 api_router.include_router(search_router, prefix="/transactions", tags=["search"])
+api_router.include_router(balances_router, prefix="/balances", tags=["balances"])  # Account balances endpoints
 
 
 @api_router.get("/health")

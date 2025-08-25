@@ -10,7 +10,8 @@ import {
   Menu,
   X,
   TrendingUp,
-  BarChart3
+  BarChart3,
+  Wallet
 } from 'lucide-react'
 
 // Pages
@@ -22,6 +23,7 @@ import SourcesEnhanced from './pages/SourcesEnhanced'
 import Budgets from './pages/Budgets'
 import ItemInspector from './pages/ItemInspector'
 import Income from './pages/Income'
+import BalancesPage from './pages/BalancesPage'
 
 // Components
 import { Button } from './components/ui/button'
@@ -30,6 +32,7 @@ import { Card } from './components/ui/card'
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
   { name: 'Analytics', href: '/analytics', icon: BarChart3 },
+  { name: 'Balances', href: '/balances', icon: Wallet },
   { name: 'Transactions', href: '/transactions', icon: CreditCard },
   { name: 'Income', href: '/income', icon: TrendingUp },
   { name: 'Mapping Studio', href: '/mapping', icon: Settings },
@@ -132,6 +135,7 @@ function App() {
               <Routes>
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/analytics" element={<AnalyticsDashboard />} />
+                <Route path="/balances" element={<BalancesPage />} />
                 <Route path="/transactions" element={<Transactions />} />
                 <Route path="/income" element={<Income />} />
                 <Route path="/mapping" element={<MappingStudio />} />

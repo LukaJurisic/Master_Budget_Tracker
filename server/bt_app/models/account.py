@@ -1,5 +1,5 @@
 """Account model."""
-from sqlalchemy import Column, String, Integer, ForeignKey, Boolean
+from sqlalchemy import Column, String, Integer, ForeignKey, Boolean, Numeric
 from sqlalchemy.orm import relationship
 from .base import BaseModel
 
@@ -15,12 +15,16 @@ class Account(BaseModel):
     mask = Column(String(10))  # Last 4 digits
     official_name = Column(String(255))
     currency = Column(String(3), default="CAD")
-    account_type = Column(String(50))  # checking, savings, credit, etc.
+    account_type = Column(String(50))  # asset or liability
+    account_subtype = Column(String(50))  # checking, savings, credit card, investment, etc.
+    iso_currency_code = Column(String(3))  # ISO 4217 currency code
+    limit = Column(Numeric(15, 2), nullable=True)  # Credit limit for credit cards
     is_enabled_for_import = Column(Boolean, default=True)  # Control which accounts to import
     
     # Relationships
     institution_item = relationship("InstitutionItem", back_populates="accounts")
     transactions = relationship("Transaction", back_populates="account", cascade="all, delete-orphan")
+    balances = relationship("AccountBalance", back_populates="account", cascade="all, delete-orphan")
     
     def __repr__(self):
         return f"<Account(id={self.id}, name={self.name}, mask={self.mask})>"
