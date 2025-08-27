@@ -43,24 +43,37 @@ class BalanceService:
         self.db = db
         self.provider = PlaidBalanceProvider()
     
-    def refresh_all_balances(self, user_id: Optional[str] = None) -> RefreshResult:
-        """Refresh balances for all linked accounts.
+    def refresh_all_balances(self, user_id: Optional[str] = None, account_ids: Optional[List[int]] = None) -> RefreshResult:
+        """Refresh balances for linked accounts.
         
         Args:
             user_id: Optional user ID for filtering (not used in current implementation)
+            account_ids: Optional list of account IDs to refresh. If None, refreshes all accounts.
             
         Returns:
             RefreshResult with totals and account details
         """
         result = RefreshResult()
         
-        # Get all institution items with their access tokens
-        items = self.db.query(InstitutionItem).filter(
+        # Get institution items, optionally filtered by account IDs
+        query = self.db.query(InstitutionItem).filter(
             InstitutionItem.access_token_encrypted.isnot(None)
-        ).all()
+        )
+        
+        if account_ids:
+            # Filter to only institution items that have the requested accounts
+            from sqlalchemy import and_
+            query = query.join(InstitutionItem.accounts).filter(
+                and_(
+                    Account.id.in_(account_ids),
+                    Account.is_enabled_for_import == True
+                )
+            ).distinct()
+        
+        items = query.all()
         
         if not items:
-            result.errors.append("No linked accounts found")
+            result.errors.append("No linked accounts found" if not account_ids else "No matching accounts found")
             return result
         
         # Prepare access tokens for the provider
@@ -79,6 +92,10 @@ class BalanceService:
             try:
                 # Find or create the account
                 account = self._upsert_account(dto)
+                
+                # Skip if we're filtering by account IDs and this isn't selected
+                if account_ids and account.id not in account_ids:
+                    continue
                 
                 # Upsert the daily balance snapshot
                 balance = self._upsert_balance(account, dto, today)
@@ -208,7 +225,7 @@ class BalanceService:
         return balance
     
     def get_latest_balances(self, user_id: Optional[str] = None) -> Dict[str, Any]:
-        """Get the latest balance snapshot for all accounts.
+        """Get the latest balance snapshot for all accounts including NDAX.
         
         Args:
             user_id: Optional user ID for filtering (not used in current implementation)
@@ -253,6 +270,22 @@ class BalanceService:
                     "limit": float(account.limit) if account.limit else None,
                     "last_updated": latest_balance.as_of.isoformat(),
                 })
+        
+        # Add NDAX balance to totals if connected
+        from ...models.external_integration import ExternalIntegration, ProviderType
+        integration = self.db.query(ExternalIntegration).filter(
+            ExternalIntegration.provider == ProviderType.NDAX,
+            ExternalIntegration.is_active == True
+        ).first()
+        
+        if integration and integration.cached_balances:
+            try:
+                import json
+                balances = json.loads(integration.cached_balances)
+                ndax_total_cad = sum(b.get("value_cad", 0) for b in balances)
+                assets_total += Decimal(str(ndax_total_cad))
+            except Exception:
+                pass  # If we can't load NDAX balances, continue without them
         
         return {
             "accounts": accounts_data,

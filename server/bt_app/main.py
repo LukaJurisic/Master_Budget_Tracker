@@ -1,6 +1,4 @@
 """Main FastAPI application."""
-print(">>> LOADED bt_app.main FROM:", __file__)
-print(">>> BT_APP PACKAGE IS NOW ACTIVE!")
 import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
@@ -14,6 +12,7 @@ from .core.scheduler import start_scheduler, stop_scheduler
 from .models import base  # Import to register models
 from .api.routes_root import api_router
 from .api.routes_analytics_freq import router as analytics_freq_router
+# from .api.routes_ndax import router as ndax_router  # DISABLED - using old integrations router instead
 
 # Configure logging
 logging.basicConfig(
@@ -88,6 +87,9 @@ app.include_router(api_router, prefix="/api")
 
 # Mount the frequency router under the same prefix the FE expects
 app.include_router(analytics_freq_router, prefix="/api/analytics", tags=["analytics"])
+
+# Mount the NDAX router - DISABLED, using old integrations router instead
+# app.include_router(ndax_router)
 
 
 @app.get("/")

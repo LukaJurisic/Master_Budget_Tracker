@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis, ReferenceLine } from 'recharts'
+import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis, ReferenceLine, ComposedChart, Bar } from 'recharts'
 import { formatCurrency } from '@/lib/formatters'
 import { apiClient, CategorySeries } from '@/lib/api'
 import { EmptyState } from './EmptyState'
@@ -52,14 +52,23 @@ export function CategoryFocus({ dateFrom, dateTo, disabled }: CategoryFocusProps
 
   // Get category series data
   const { data: categoryData, isLoading: categoryLoading } = useQuery({
-    queryKey: ['analytics-category-series', selectedCategoryId, dateFrom, dateTo],
-    queryFn: () => selectedCategoryId ? apiClient.getAnalyticsCategorySeries(selectedCategoryId, dateFrom, dateTo) : Promise.resolve(null),
+    queryKey: ['analytics-category-series-v2', selectedCategoryId, dateFrom, dateTo], // v2 to bust cache
+    queryFn: () => {
+      if (!selectedCategoryId) return Promise.resolve(null);
+      if (selectedCategoryId === -1) {
+        // For "All Categories", we'll need a new endpoint or aggregate the data
+        return apiClient.getAnalyticsAllCategoriesSeries(dateFrom, dateTo);
+      }
+      return apiClient.getAnalyticsCategorySeries(selectedCategoryId, dateFrom, dateTo);
+    },
     enabled: !!selectedCategoryId && !!dateFrom && !!dateTo,
   })
 
   const handleCategoryChange = (value: string) => {
     if (value === '' || value === '__none__') {
       setSelectedCategoryId(null)
+    } else if (value === 'all') {
+      setSelectedCategoryId(-1) // Use -1 to indicate "all categories"
     } else {
       setSelectedCategoryId(parseInt(value))
     }
@@ -68,6 +77,7 @@ export function CategoryFocus({ dateFrom, dateTo, disabled }: CategoryFocusProps
   const formatChartData = (data: CategorySeries) => {
     const months = data?.months ?? data?.series?.map((s: any) => s.month) ?? [];
     const values = data?.values ?? data?.series?.map((s: any) => s.amount) ?? [];
+    const txnCounts = data?.txn_counts ?? data?.series?.map((s: any) => s.txn_count) ?? [];
     
     if (months.length === 0) return [];
     
@@ -81,6 +91,7 @@ export function CategoryFocus({ dateFrom, dateTo, disabled }: CategoryFocusProps
       return {
         month: monthLabel,
         amount: values[index] ?? 0,
+        txn_count: txnCounts[index] ?? 0,
       }
     })
   }
@@ -95,7 +106,7 @@ export function CategoryFocus({ dateFrom, dateTo, disabled }: CategoryFocusProps
     <Card>
       <CardHeader>
         <CardTitle>Category Focus</CardTitle>
-        <CardDescription>Monthly spending for a specific category with average line</CardDescription>
+        <CardDescription>Monthly spending with transaction count overlay and average line</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
@@ -104,7 +115,7 @@ export function CategoryFocus({ dateFrom, dateTo, disabled }: CategoryFocusProps
             <label className="text-sm font-medium">Category:</label>
             <div className="w-64">
               <Select 
-                value={selectedCategoryId ? selectedCategoryId.toString() : ""} 
+                value={selectedCategoryId === null ? "" : selectedCategoryId === -1 ? "all" : selectedCategoryId.toString()} 
                 onValueChange={handleCategoryChange}
               >
                 <SelectTrigger>
@@ -112,6 +123,7 @@ export function CategoryFocus({ dateFrom, dateTo, disabled }: CategoryFocusProps
                 </SelectTrigger>
                 <SelectContent position="popper" sideOffset={6} avoidCollisions>
                   <SelectItem value="__none__">Select a category to analyze</SelectItem>
+                  <SelectItem value="all">All Categories</SelectItem>
                   {expenseCategories.map((category) => (
                     <SelectItem key={category.id} value={category.id.toString()}>
                       {category.name}
@@ -140,7 +152,7 @@ export function CategoryFocus({ dateFrom, dateTo, disabled }: CategoryFocusProps
               />
             ) : (
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={formatChartData(categoryData)} margin={{ top: 20, right: 30, left: 80, bottom: 70 }}>
+                <ComposedChart data={formatChartData(categoryData)} margin={{ top: 20, right: 50, left: 80, bottom: 70 }}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis 
                     dataKey="month" 
@@ -149,14 +161,36 @@ export function CategoryFocus({ dateFrom, dateTo, disabled }: CategoryFocusProps
                     height={60}
                     fontSize={12}
                   />
-                  <YAxis tickFormatter={formatCurrency} width={70} />
+                  <YAxis yAxisId="amount" tickFormatter={formatCurrency} width={70} />
+                  <YAxis yAxisId="count" orientation="right" width={50} />
                   <Tooltip 
-                    formatter={(value: number) => [formatCurrency(value), 'Amount']}
+                    formatter={(value: number, name: string, props: any) => {
+                      if (name === 'amount') return [formatCurrency(value), 'Amount'];
+                      if (name === 'txn_count') {
+                        const amount = props.payload.amount;
+                        const avgPerTxn = value > 0 ? amount / value : 0;
+                        return [
+                          <span style={{ color: '#22c55e', fontWeight: 500 }}>
+                            {value} (avg: {formatCurrency(avgPerTxn)})
+                          </span>, 
+                          'Transactions'
+                        ];
+                      }
+                      return [value, name];
+                    }}
                     labelFormatter={(label) => `Month: ${label}`}
+                    contentStyle={{ backgroundColor: 'rgba(255, 255, 255, 0.95)', border: '1px solid #e5e7eb' }}
+                    itemSorter={(item: any) => {
+                      // Sort to show amount first, then txn_count
+                      if (item.dataKey === 'amount') return -1;
+                      if (item.dataKey === 'txn_count') return 1;
+                      return 0;
+                    }}
                   />
                   
                   {/* Average line in blue */}
                   <ReferenceLine 
+                    yAxisId="amount"
                     y={categoryData.monthly_avg ?? 0} 
                     stroke="#3b82f6" 
                     strokeDasharray="5 5"
@@ -167,8 +201,19 @@ export function CategoryFocus({ dateFrom, dateTo, disabled }: CategoryFocusProps
                     }}
                   />
                   
+                  {/* Transaction count bars - darker for better visibility */}
+                  <Bar
+                    yAxisId="count"
+                    dataKey="txn_count"
+                    fill="rgba(34, 197, 94, 0.5)"
+                    stroke="#16a34a"
+                    strokeWidth={1}
+                    name="txn_count"
+                  />
+                  
                   {/* Spending line */}
                   <Line
+                    yAxisId="amount"
                     type="monotone"
                     dataKey="amount"
                     stroke="#3b82f6"
@@ -177,19 +222,24 @@ export function CategoryFocus({ dateFrom, dateTo, disabled }: CategoryFocusProps
                     dot={{ r: 4, fill: "#3b82f6" }}
                     activeDot={{ r: 6, fill: "#2563eb" }}
                   />
-                </LineChart>
+                </ComposedChart>
               </ResponsiveContainer>
             )}
           </div>
 
           {/* Summary stats */}
-          {categoryData && (categoryData.total ?? 0) > 0 && formatChartData(categoryData).length > 0 && (
-            <div className="flex justify-between text-sm text-gray-600 pt-2 border-t">
-              <span>Total: {formatCurrency(categoryData.total ?? 0)}</span>
-              <span>Average: {formatCurrency(categoryData.monthly_avg ?? 0)}/month</span>
-              <span>{formatChartData(categoryData).length} months</span>
-            </div>
-          )}
+          {categoryData && (categoryData.total ?? 0) > 0 && formatChartData(categoryData).length > 0 && (() => {
+            const totalTxns = (categoryData.txn_counts ?? []).reduce((sum, count) => sum + count, 0);
+            const avgPerTxn = totalTxns > 0 ? (categoryData.total ?? 0) / totalTxns : 0;
+            return (
+              <div className="flex justify-between text-sm text-gray-600 pt-2 border-t">
+                <span>Total: {formatCurrency(categoryData.total ?? 0)}</span>
+                <span>Monthly Avg: {formatCurrency(categoryData.monthly_avg ?? 0)}</span>
+                <span>Avg/Transaction: {formatCurrency(avgPerTxn)}</span>
+                <span>{formatChartData(categoryData).length} months</span>
+              </div>
+            );
+          })()}
         </div>
       </CardContent>
     </Card>

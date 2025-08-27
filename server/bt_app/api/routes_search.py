@@ -78,7 +78,22 @@ def search_transactions(
         # BM25 relevance scoring with description weight 1.0, merchant weight 1.3
         # Lower rank = better relevance
         # Return all the same fields as regular transactions endpoint
-        sql = text("""
+        # Fallback to regular SQL LIKE search since FTS5 is not available
+        search_terms = [term.lower() for term in _word.findall(q)]
+        
+        # Build LIKE conditions for each search term
+        search_conditions = []
+        for i, term in enumerate(search_terms):
+            search_conditions.append(f"""(
+                LOWER(t.merchant_norm) LIKE :term_{i} OR 
+                LOWER(t.description_norm) LIKE :term_{i} OR 
+                LOWER(t.merchant_raw) LIKE :term_{i} OR 
+                LOWER(t.description_raw) LIKE :term_{i}
+            )""")
+        
+        search_where = " AND ".join(search_conditions)
+        
+        sql = text(f"""
             SELECT
               t.id, 
               t.posted_date, 
@@ -104,11 +119,10 @@ def search_transactions(
               c.color as cat_color,
               c.created_at as cat_created_at,
               c.updated_at as cat_updated_at,
-              bm25(txn_fts, 1.0, 1.3) AS rank
-            FROM txn_fts
-            JOIN transactions t ON t.id = txn_fts.rowid
+              1.0 AS rank
+            FROM transactions t
             LEFT JOIN categories c ON c.id = t.category_id
-            WHERE txn_fts MATCH :match
+            WHERE ({search_where})
               AND COALESCE(t.is_deleted, 0) = 0
               AND (:date_from IS NULL OR date(t.posted_date) >= date(:date_from))
               AND (:date_to IS NULL OR date(t.posted_date) <= date(:date_to))
@@ -116,12 +130,12 @@ def search_transactions(
               AND (:amount_min IS NULL OR ABS(t.amount) >= :amount_min)
               AND (:amount_max IS NULL OR ABS(t.amount) <= :amount_max)
               AND (:cleaned_merchant IS NULL OR t.cleaned_final_merchant LIKE '%' || :cleaned_merchant || '%')
-            ORDER BY t.posted_date DESC, rank ASC
+            ORDER BY t.posted_date DESC
             LIMIT :limit OFFSET :offset
         """)
 
-        result = db.execute(sql, {
-            "match": match,
+        # Prepare parameters including search terms
+        params = {
             "date_from": date_from,
             "date_to": date_to,
             "category_id": category_id,
@@ -130,16 +144,21 @@ def search_transactions(
             "cleaned_merchant": cleaned_merchant,
             "limit": limit,
             "offset": offset,
-        })
+        }
+        
+        # Add search term parameters
+        for i, term in enumerate(search_terms):
+            params[f"term_{i}"] = f"%{term}%"
+        
+        result = db.execute(sql, params)
         
         rows = result.mappings().all()
         
         # Get total count for pagination
-        count_sql = text("""
+        count_sql = text(f"""
             SELECT COUNT(*) as total
-            FROM txn_fts
-            JOIN transactions t ON t.id = txn_fts.rowid
-            WHERE txn_fts MATCH :match
+            FROM transactions t
+            WHERE ({search_where})
               AND COALESCE(t.is_deleted, 0) = 0
               AND (:date_from IS NULL OR date(t.posted_date) >= date(:date_from))
               AND (:date_to IS NULL OR date(t.posted_date) <= date(:date_to))
@@ -149,15 +168,20 @@ def search_transactions(
               AND (:cleaned_merchant IS NULL OR t.cleaned_final_merchant LIKE '%' || :cleaned_merchant || '%')
         """)
         
-        count_result = db.execute(count_sql, {
-            "match": match,
+        count_params = {
             "date_from": date_from,
             "date_to": date_to,
             "category_id": category_id,
             "amount_min": amount_min,
             "amount_max": amount_max,
             "cleaned_merchant": cleaned_merchant,
-        }).scalar()
+        }
+        
+        # Add search term parameters to count query
+        for i, term in enumerate(search_terms):
+            count_params[f"term_{i}"] = f"%{term}%"
+        
+        count_result = db.execute(count_sql, count_params).scalar()
         
         # Format transactions to match regular endpoint format
         transactions = []

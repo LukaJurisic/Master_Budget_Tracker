@@ -14,7 +14,16 @@
       "Bash(alembic revision:*)",
       "Bash(alembic upgrade:*)",
       "Bash(mkdir:*)",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "Bash(grep:*)",
+      "Bash(pip install:*)",
+      "Bash(alembic:*)",
+      "Bash(npm run dev:*)",
+      "Bash(mv:*)",
+      "Bash(..venvScriptsactivate)",
+      "Bash(./.venv/Scripts/activate:*)",
+      "Bash(rm:*)",
+      "Bash(uvicorn:*)"
     ],
     "deny": [],
     "ask": []

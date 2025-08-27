@@ -866,15 +866,25 @@ class PlaidImportService:
                 name_safe
             )
             
-            # Check for duplicate: same date, amount, description, and category
-            existing = self.db.query(Transaction).filter(
+            # Check for duplicate by external_id (Plaid transaction ID) first
+            external_id = _safe_text(staged.plaid_transaction_id)
+            existing_by_id = self.db.query(Transaction).filter(
+                Transaction.external_id == external_id
+            ).first()
+            
+            if existing_by_id:
+                summary["skipped_duplicates"] += 1
+                continue
+                
+            # Also check for content-based duplicate: same date, amount, description, and category
+            existing_by_content = self.db.query(Transaction).filter(
                 Transaction.posted_date == staged.date,
                 Transaction.amount == abs(staged.amount),
                 Transaction.description_norm == description_norm,
                 Transaction.category_id == staged.suggested_category_id
             ).first()
             
-            if existing:
+            if existing_by_content:
                 summary["skipped_duplicates"] += 1
                 continue
             

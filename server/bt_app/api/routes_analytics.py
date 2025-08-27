@@ -665,14 +665,15 @@ def get_category_series(
     date_to: str = Query(..., description="End date (YYYY-MM-DD)"),
     db: Session = Depends(get_database)
 ):
-    """Get time series data for a specific category."""
+    """Get time series data for a specific category with transaction counts."""
     from sqlalchemy import text
     
-    # Get monthly spending for the specific category within date range
+    # Get monthly spending and transaction counts for the specific category within date range
     series_query = text("""
         SELECT 
             strftime('%Y-%m', t.posted_date) as month,
-            SUM(ABS(t.amount)) as amount
+            SUM(ABS(t.amount)) as amount,
+            COUNT(t.id) as txn_count
         FROM transactions t
         WHERE t.category_id = :category_id
           AND t.posted_date >= :date_from
@@ -692,14 +693,17 @@ def get_category_series(
     series = []
     months = []
     values = []
+    txn_counts = []
     
     for row in series_results:
         month = row.month
         amount = float(row.amount)
+        txn_count = int(row.txn_count)
         
-        series.append({"month": month, "amount": amount})
+        series.append({"month": month, "amount": amount, "txn_count": txn_count})
         months.append(month)
         values.append(amount)
+        txn_counts.append(txn_count)
     
     # Calculate totals and averages
     total_amount = sum(values) if values else 0
@@ -709,9 +713,69 @@ def get_category_series(
         "series": series,
         "months": months,
         "values": values,
+        "txn_counts": txn_counts,
         "total": total_amount,
         "monthly_avg": monthly_avg,
         "category_id": category_id,
+        "date_range": {"start_date": date_from, "end_date": date_to}
+    }
+
+@router.get("/all-categories-series")
+def get_all_categories_series(
+    date_from: str = Query(..., description="Start date (YYYY-MM-DD)"),
+    date_to: str = Query(..., description="End date (YYYY-MM-DD)"),
+    db: Session = Depends(get_database)
+):
+    """Get time series data for all categories combined with transaction counts."""
+    from sqlalchemy import text
+    
+    # Get monthly spending and transaction counts for all categories within date range
+    series_query = text("""
+        SELECT 
+            strftime('%Y-%m', t.posted_date) as month,
+            SUM(ABS(t.amount)) as amount,
+            COUNT(t.id) as txn_count
+        FROM transactions t
+        WHERE t.posted_date >= :date_from
+          AND t.posted_date <= :date_to
+          AND t.txn_type = 'expense'
+        GROUP BY strftime('%Y-%m', t.posted_date)
+        ORDER BY month
+    """)
+    
+    series_results = db.execute(series_query, {
+        "date_from": date_from,
+        "date_to": date_to
+    }).fetchall()
+    
+    # Format series data
+    series = []
+    months = []
+    values = []
+    txn_counts = []
+    
+    for row in series_results:
+        month = row.month
+        amount = float(row.amount)
+        txn_count = int(row.txn_count)
+        
+        series.append({"month": month, "amount": amount, "txn_count": txn_count})
+        months.append(month)
+        values.append(amount)
+        txn_counts.append(txn_count)
+    
+    # Calculate totals and averages
+    total_amount = sum(values) if values else 0
+    monthly_avg = total_amount / len(values) if values else 0
+    
+    return {
+        "series": series,
+        "months": months,
+        "values": values,
+        "txn_counts": txn_counts,
+        "total": total_amount,
+        "monthly_avg": monthly_avg,
+        "category_id": -1,  # Indicates all categories
         "date_range": {"start_date": date_from, "end_date": date_to}
     }
 

@@ -28,6 +28,7 @@ import BalancesPage from './pages/BalancesPage'
 // Components
 import { Button } from './components/ui/button'
 import { Card } from './components/ui/card'
+import { Toaster } from './components/ui/toaster'
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
@@ -148,6 +149,7 @@ function App() {
           </div>
         </main>
       </div>
+      <Toaster />
     </div>
   )
 }

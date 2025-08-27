@@ -301,6 +301,7 @@ export interface SummaryRange {
 export interface CategorySeries {
   months: string[]
   values: number[]
+  txn_counts: number[]
   total: number
   monthly_avg: number
 }
@@ -747,6 +748,13 @@ export const apiClient = {
   async getAnalyticsCategorySeries(categoryId: number, dateFrom: string, dateTo: string): Promise<CategorySeries> {
     const response = await api.get('/analytics/category-series', { 
       params: { category_id: categoryId, date_from: dateFrom, date_to: dateTo } 
+    })
+    return response.data
+  },
+
+  async getAnalyticsAllCategoriesSeries(dateFrom: string, dateTo: string): Promise<CategorySeries> {
+    const response = await api.get('/analytics/all-categories-series', { 
+      params: { date_from: dateFrom, date_to: dateTo } 
     })
     return response.data
   },
