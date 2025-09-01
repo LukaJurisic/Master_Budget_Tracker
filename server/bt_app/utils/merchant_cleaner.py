@@ -59,6 +59,10 @@ def normalize_merchant_name(merchant: str) -> str:
     
     # Specific merchant consolidations
     merchant_mappings = {
+        # Winners/Winner Studio fix
+        r'WINNER STUDIO.*': 'WINNERS',
+        r'WINNERS #?\d+.*': 'WINNERS',  # WINNERS #483, WINNERS 483 TORONTO, etc.
+        
         # Tim Hortons variations
         r'TIM HORTONS.*': 'TIM HORTONS',
         r'TIM HORTON.*': 'TIM HORTONS',
