@@ -918,6 +918,13 @@ class PlaidImportService:
             else:
                 source = "Plaid"  # Default fallback
             
+            # Generate cleaned final merchant
+            from ..utils.merchant_cleaner import clean_final_merchant
+            cleaned_merchant = clean_final_merchant(
+                _safe_text(merchant_name_safe or name_safe),
+                _safe_text(name_safe)
+            )
+            
             transaction = Transaction(
                 account_id=staged.account_id,
                 plaid_transaction_id=_safe_text(staged.plaid_transaction_id),
@@ -929,6 +936,7 @@ class PlaidImportService:
                 description_raw=_safe_text(name_safe),
                 merchant_norm=_safe_text(merchant_norm),
                 description_norm=_safe_text(description_norm),
+                cleaned_final_merchant=_safe_text(cleaned_merchant),
                 category_id=staged.suggested_category_id,
                 subcategory_id=staged.suggested_subcategory_id,
                 source=_safe_text(source),  # Use determined source
