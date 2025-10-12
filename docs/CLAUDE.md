@@ -18,29 +18,123 @@ A personal finance application that replicates Excel-based budget workflow with 
 ```
 budget-tracker/
 ├── server/               # FastAPI backend
-│   ├── app/             # Main application code
+│   ├── bt_app/          # Main application code
 │   │   ├── api/         # Route handlers
 │   │   ├── models/      # SQLAlchemy models
 │   │   ├── schemas/     # Pydantic validation
 │   │   └── services/    # Business logic
 │   ├── migrations/      # Alembic database migrations
+│   ├── scripts/         # Utility scripts
+│   │   ├── demo/       # Demo mode scripts
+│   │   ├── maintenance/ # Database maintenance
+│   │   └── dev/        # Development utilities
 │   └── tests/          # Pytest test files
 ├── web/                 # React frontend
 │   └── src/
 │       ├── pages/      # Route components
 │       ├── components/ # Reusable UI components
 │       └── lib/        # API client and utilities
+├── docs/                # Documentation
 └── .env                # Environment variables (root level)
 ```
 
-## Development Commands
+## 🚀 Starting the Servers
 
-### Quick Setup (Windows)
+### **Option 1: Production Mode (Real Data)**
+
+#### Backend (Port 8000)
+```powershell
+cd budget-tracker/server
+$env:APP_MODE = "production"
+$env:DATABASE_URL = "sqlite:///C:/Users/lukaj/OneDrive/Desktop/Folders/Budgeting/Budget App/budget-tracker/server/bt_app/app.db"
+.\.venv\Scripts\Activate.ps1
+uvicorn bt_app.main:app --reload --port 8000
+```
+
+**Or use the production start script:**
+```powershell
+cd budget-tracker/server
+.\scripts\demo\start_production.ps1
+```
+
+#### Frontend (Port 3002)
+```powershell
+cd budget-tracker/web
+npm run dev
+```
+
+---
+
+### **Option 2: Demo Mode (Fake Data for Testing)**
+
+#### Backend (Port 8000) - Demo Database
+```powershell
+cd budget-tracker/server
+$env:APP_MODE = "demo"
+$env:DATABASE_URL = "sqlite:///C:/Users/lukaj/OneDrive/Desktop/Folders/Budgeting/Budget App/budget-tracker/server/bt_app/demo.db"
+$env:ENABLE_PLAID_IN_DEMO = "false"
+.\.venv\Scripts\Activate.ps1
+uvicorn bt_app.main:app --reload --port 8000
+```
+
+**Or use the demo start script:**
+```powershell
+cd budget-tracker/server
+.\scripts\demo\start_demo.ps1
+```
+
+#### Frontend (Port 3002)
+```powershell
+cd budget-tracker/web
+npm run dev
+```
+
+#### Regenerate Demo Database
+```powershell
+cd budget-tracker/server
+.\scripts\demo\regenerate_demo.ps1
+```
+
+---
+
+### **Option 3: Quick Setup (First Time)**
+
+#### Full Automated Setup
 ```powershell
 cd budget-tracker
-.\setup.ps1              # Full automated setup
-.\start-all.ps1          # Start both backend and frontend
+.\setup.ps1              # Installs dependencies, runs migrations, seeds data
 ```
+
+#### After Setup - Start Both Servers
+```powershell
+# Option A: Production mode
+cd server
+.\scripts\demo\start_production.ps1  # Opens 2 terminal windows
+
+# Option B: Demo mode
+cd server
+.\scripts\demo\start_demo.ps1        # Opens 2 terminal windows
+```
+
+---
+
+### **URLs After Starting**
+- **Frontend**: http://localhost:3002
+- **Backend API**: http://localhost:8000
+- **API Docs**: http://localhost:8000/docs
+- **System Mode Check**: http://localhost:8000/api/system/mode
+
+---
+
+### **Kill Servers (If Stuck)**
+```powershell
+cd budget-tracker/server
+.\scripts\dev\kill_ports.ps1
+```
+
+---
+
+## Development Commands
 
 ### Backend Commands
 ```bash
@@ -49,8 +143,8 @@ cd server
 pip install -r requirements.txt   # Install dependencies
 alembic upgrade head              # Run database migrations
 alembic revision --autogenerate -m "description"  # Create migration
-python seed_data.py               # Seed categories from Excel
-uvicorn app.main:app --reload --port 8000  # Start server
+python scripts/maintenance/seed_data.py  # Seed categories
+uvicorn bt_app.main:app --reload --port 8000  # Start server manually
 pytest tests/ -v                  # Run all tests
 pytest tests/test_normalization.py::test_function -v  # Single test
 ```
@@ -59,10 +153,19 @@ pytest tests/test_normalization.py::test_function -v  # Single test
 ```bash
 cd web
 npm install               # Install dependencies
-npm run dev              # Start dev server (port 3000)
+npm run dev              # Start dev server (port 3002)
 npm run build            # Production build
 npm run lint             # Run ESLint
 npx tsc --noEmit         # Type check without building
+```
+
+### Database Operations
+```bash
+cd server
+alembic revision --autogenerate -m "Description"  # Create migration
+alembic current                   # Show current revision
+alembic stamp head                # Mark current DB as up-to-date
+alembic downgrade -1              # Rollback one migration
 ```
 
 ## Core Business Logic
@@ -219,8 +322,30 @@ DATABASE_URL=sqlite:///./app.db
 
 ## Performance Notes
 
-- Frontend runs on port 3000, backend on 8000
+- Frontend runs on port 3002, backend on 8000
 - Use absolute file paths in all operations
 - Batch rule creation for Quick Assign efficiency
 - Query invalidation pattern prevents stale data
 - SQLite suitable for personal use; easy PostgreSQL migration path
+
+## Demo vs Production Mode
+
+The application supports two modes:
+
+### Production Mode
+- Uses `bt_app/app.db` (real financial data)
+- Plaid integration enabled
+- All features available
+- Set with `APP_MODE=production`
+
+### Demo Mode
+- Uses `bt_app/demo.db` (fake generated data)
+- 12 months of sample transactions
+- Plaid connection button disabled (with tooltip)
+- Perfect for testing, demos, or development
+- Set with `APP_MODE=demo`
+
+**Switch modes by:**
+1. Using environment variable: `$env:APP_MODE = "demo"` or `"production"`
+2. Using start scripts: `start_demo.ps1` or `start_production.ps1`
+3. Checking current mode: `GET /api/system/mode`
