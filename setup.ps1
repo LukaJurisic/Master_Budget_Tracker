@@ -61,7 +61,7 @@ Write-Host "✓ Database migrations completed" -ForegroundColor Green
 
 # Seed database with sample data
 Write-Host "Seeding database with sample data..."
-python seed_data.py
+python scripts/maintenance/seed_data.py
 Write-Host "✓ Sample data seeded" -ForegroundColor Green
 
 Set-Location ".."
@@ -87,7 +87,7 @@ $backendScript = @"
 Write-Host "🚀 Starting Budget Tracker Backend..." -ForegroundColor Green
 Set-Location "server"
 & ".\.venv\Scripts\Activate.ps1"
-uvicorn app.main:app --reload --port 8000
+uvicorn bt_app.main:app --reload --port 8000
 "@
 
 $backendScript | Out-File -FilePath "start-backend.ps1" -Encoding UTF8
@@ -113,7 +113,7 @@ Write-Host "🚀 Starting Budget Tracker (Full Stack)..." -ForegroundColor Green
 `$backendJob = Start-Job -ScriptBlock {
     Set-Location "$pwd\server"
     & ".\.venv\Scripts\Activate.ps1"
-    uvicorn app.main:app --reload --port 8000
+    uvicorn bt_app.main:app --reload --port 8000
 }
 
 Write-Host "✓ Backend started in background (Job ID: `$(`$backendJob.Id))" -ForegroundColor Green

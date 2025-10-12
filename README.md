@@ -40,13 +40,53 @@ A personal budget tracking application with Plaid integration for automatic tran
 
 3. **Start the application**
    ```powershell
-   # Start both backend and frontend
-   .\start-all.ps1
+   # Production mode (with real data)
+   cd server
+   .\scripts\demo\start_production.ps1
+   
+   # Demo mode (with fake data for testing)
+   cd server
+   .\scripts\demo\start_demo.ps1
    
    # Or start separately:
    .\start-backend.ps1  # Terminal 1
    .\start-frontend.ps1 # Terminal 2
    ```
+
+## 🎭 Demo Mode
+
+Try out the app with fake data before connecting your real accounts:
+
+```powershell
+cd server
+.\scripts\demo\regenerate_demo.ps1  # Generate demo database
+.\scripts\demo\start_demo.ps1       # Start in demo mode
+```
+
+Demo mode includes:
+- 12 months of realistic fake transactions
+- Sample categories and mappings
+- Staging imports to test the import workflow
+- Full UI functionality without Plaid connection
+
+## 📁 Repository Structure
+
+```
+budget-tracker/
+├── server/              # FastAPI backend
+│   ├── bt_app/         # Main application code
+│   ├── migrations/     # Database migrations
+│   ├── scripts/        # Utility scripts
+│   │   ├── demo/      # Demo mode scripts
+│   │   ├── maintenance/ # DB maintenance
+│   │   └── dev/       # Development utilities
+│   └── tests/         # Backend tests
+├── web/                # React frontend
+├── docs/               # Documentation
+│   ├── bugs/          # Bug screenshots
+│   └── *.md           # Technical docs
+└── excel_views/        # Excel import templates
+```
 
 ## Manual Setup
 
