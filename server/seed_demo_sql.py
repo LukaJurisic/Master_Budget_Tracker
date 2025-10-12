@@ -50,11 +50,15 @@ def seed_demo_sql():
         txn_count = 0
         
         # Helper to insert transaction
-        def insert_txn(account_id, posted_date, amount, merchant, description):
+        def insert_txn(account_id, posted_date, amount, merchant, description, txn_type=None):
+            # Auto-detect txn_type based on amount if not specified
+            if txn_type is None:
+                txn_type = 'income' if amount > 0 else 'expense'
+            
             cursor.execute("""
-                INSERT INTO transactions (account_id, posted_date, amount, currency, merchant_raw, description_raw, merchant_norm, source, hash_dedupe, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
-            """, (account_id, posted_date.isoformat(), float(amount), "USD", merchant, description, merchant, "demo", f"demo_{merchant}_{posted_date}_{random.randint(1, 9999)}"))
+                INSERT INTO transactions (account_id, posted_date, amount, currency, merchant_raw, description_raw, merchant_norm, source, hash_dedupe, txn_type, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+            """, (account_id, posted_date.isoformat(), float(amount), "USD", merchant, description, merchant, "demo", f"demo_{merchant}_{posted_date}_{random.randint(1, 9999)}", txn_type))
         
         # Generate transactions
         current = start_date
