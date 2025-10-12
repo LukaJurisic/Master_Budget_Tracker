@@ -114,8 +114,8 @@ def enhance_demo_data():
                 # Generate unique transaction date within 30 days before import
                 txn_date = import_date - timedelta(days=random.randint(0, 30))
                 
-                # Random amount
-                amount = -round(random.uniform(*price_range), 2)
+                # Random amount (positive for Plaid convention: positive = expense)
+                amount = round(random.uniform(*price_range), 2)
                 
                 # Unique identifier to avoid deduplication
                 unique_id = f"{import_idx}_{txn_idx}_{random.randint(1000, 9999)}"
