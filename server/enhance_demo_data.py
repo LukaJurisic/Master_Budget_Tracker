@@ -59,9 +59,12 @@ def enhance_demo_data():
         # Create staging imports with unique transactions
         print("\n📦 Creating staging imports...")
         
-        # Get account IDs
+        # Get account IDs and institution item ID
         cursor.execute("SELECT id FROM accounts LIMIT 2")
         account_ids = [row[0] for row in cursor.fetchall()]
+        
+        cursor.execute("SELECT id FROM institution_items LIMIT 1")
+        chase_item_id = cursor.fetchone()[0]
         
         staging_merchants = [
             ("Target", "TARGET #", (25, 120), "Shopping"),
@@ -83,8 +86,25 @@ def enhance_demo_data():
         end_date = date.today()
         import_dates = [end_date - timedelta(days=d) for d in [5, 12, 18, 25, 35, 42, 50, 58, 65, 72]]
         
+        # Create plaid_imports records for each batch
+        plaid_import_ids = []
+        for import_idx in range(import_count):
+            import_created = import_dates[import_idx]
+            # Determine start/end dates for this import (30 days before import date)
+            import_start = import_created - timedelta(days=30)
+            import_end = import_created
+            
+            cursor.execute(f"""
+                INSERT INTO plaid_imports (item_id, mode, start_date, end_date, created_at, created_by, summary_json)
+                VALUES ({chase_item_id}, 'demo', '{import_start.isoformat()}', '{import_end.isoformat()}', 
+                        '{import_created.isoformat()}', 'demo', '{{}}')
+            """)
+            plaid_import_id = cursor.lastrowid
+            plaid_import_ids.append(plaid_import_id)
+        
         for import_idx in range(import_count):
             import_date = import_dates[import_idx]
+            plaid_import_id = plaid_import_ids[import_idx]
             txn_count = random.randint(20, 30)
             
             for txn_idx in range(txn_count):
@@ -120,29 +140,15 @@ def enhance_demo_data():
                     category_id = None
                     cleaned_merchant = None
                 
-                # Insert staging transaction with correct schema
-                # import_id will be the import batch number
-                import_batch_id = import_idx + 1
-                
+                plaid_txn_id = f"staging_{unique_id}"
                 cursor.execute("""
                     INSERT INTO staging_transactions 
                     (import_id, plaid_transaction_id, account_id, date, name, merchant_name, 
                      amount, currency, suggested_category_id, status, hash_key, 
                      created_at, updated_at)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
-                """, (
-                    import_batch_id, 
-                    f"staging_{unique_id}",  # plaid_transaction_id
-                    account_id, 
-                    txn_date.isoformat(),  # date
-                    description,  # name
-                    merchant,  # merchant_name
-                    amount, 
-                    "USD",
-                    category_id,  # suggested_category_id
-                    status, 
-                    hash_dedupe  # hash_key
-                ))
+                """, (plaid_import_id, plaid_txn_id, account_id, txn_date.isoformat(),
+                      description, merchant, amount, 'USD', category_id, status, hash_dedupe))
                 
                 total_staging_txns += 1
         
