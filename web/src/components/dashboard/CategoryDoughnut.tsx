@@ -1,5 +1,5 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts'
+import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { formatCurrency } from '@/lib/formatters'
 import { DashboardCategories } from '@/lib/api'
 import { EmptyState } from './EmptyState'
@@ -32,12 +32,15 @@ export function CategoryDoughnut({ data, effectiveMonth }: CategoryDoughnutProps
     )
   }
 
-  const chartData = data.breakdown.map((item, index) => ({
-    name: item.category,
-    value: item.amount,
-    percent: item.percent,
-    color: COLORS[index % COLORS.length],
-  }))
+  // Sort by amount descending for better visualization
+  const chartData = data.breakdown
+    .map((item, index) => ({
+      name: item.category,
+      value: item.amount,
+      percent: item.percent,
+      color: COLORS[index % COLORS.length],
+    }))
+    .sort((a, b) => b.value - a.value)
 
   return (
     <Card>
@@ -46,28 +49,48 @@ export function CategoryDoughnut({ data, effectiveMonth }: CategoryDoughnutProps
         <CardDescription>Spending by category for {effectiveMonth}</CardDescription>
       </CardHeader>
       <CardContent>
-        <ResponsiveContainer width="100%" height={300}>
-          <PieChart>
-            <Pie
-              data={chartData}
-              cx="50%"
-              cy="50%"
-              outerRadius={100}
-              innerRadius={40}
-              fill="#8884d8"
-              dataKey="value"
-              label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-              labelLine={false}
-            >
+        <ResponsiveContainer width="100%" height={400}>
+          <BarChart 
+            data={chartData} 
+            layout="vertical"
+            margin={{ top: 5, right: 30, left: 120, bottom: 5 }}
+          >
+            <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
+            <XAxis 
+              type="number"
+              tickFormatter={(value) => formatCurrency(value)}
+            />
+            <YAxis 
+              type="category"
+              dataKey="name" 
+              width={110}
+              fontSize={12}
+            />
+            <Tooltip 
+              formatter={(value: number) => [formatCurrency(value), 'Amount']}
+              labelFormatter={(label) => `${label}`}
+              content={({ active, payload }) => {
+                if (active && payload && payload.length) {
+                  const data = payload[0].payload
+                  return (
+                    <div className="bg-white p-2 border rounded shadow-sm">
+                      <p className="font-semibold">{data.name}</p>
+                      <p className="text-sm">{formatCurrency(data.value)}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {(data.percent * 100).toFixed(1)}% of total
+                      </p>
+                    </div>
+                  )
+                }
+                return null
+              }}
+            />
+            <Bar dataKey="value" radius={[0, 4, 4, 0]}>
               {chartData.map((entry, index) => (
                 <Cell key={`cell-${index}`} fill={entry.color} />
               ))}
-            </Pie>
-            <Tooltip 
-              formatter={(value: number) => formatCurrency(value)}
-              labelFormatter={(label) => `Category: ${label}`}
-            />
-          </PieChart>
+            </Bar>
+          </BarChart>
         </ResponsiveContainer>
       </CardContent>
     </Card>

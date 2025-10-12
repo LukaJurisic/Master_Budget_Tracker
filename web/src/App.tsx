@@ -29,6 +29,8 @@ import BalancesPage from './pages/BalancesPage'
 import { Button } from './components/ui/button'
 import { Card } from './components/ui/card'
 import { Toaster } from './components/ui/toaster'
+import { DemoModeBanner } from './components/DemoModeBanner'
+import { AppModeProvider } from './contexts/AppModeContext'
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
@@ -47,7 +49,9 @@ function App() {
   const location = useLocation()
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <AppModeProvider>
+      <DemoModeBanner />
+      <div className="flex h-screen bg-gray-50">
       {/* Mobile sidebar overlay */}
       {sidebarOpen && (
         <div
@@ -151,6 +155,7 @@ function App() {
       </div>
       <Toaster />
     </div>
+    </AppModeProvider>
   )
 }
 

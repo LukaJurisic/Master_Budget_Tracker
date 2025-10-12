@@ -1,22 +1,34 @@
 """Application configuration."""
 import os
 from pathlib import Path
-from typing import List
+from typing import List, Literal
 from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     """Application settings."""
     
+    # App Mode
+    app_mode: Literal["production", "demo"] = "production"
+    
     # Database
     database_url: str = "sqlite:///./bt_app/app.db"
+    demo_database_url: str = "sqlite:///./bt_app/demo.db"
     
     @property
     def absolute_database_url(self) -> str:
         """
         Return a normalized, absolute sqlite URL with forward slashes.
+        Automatically selects demo.db if in demo mode.
         Env var DATABASE_URL wins over .env and defaults.
         """
-        url = (os.getenv("DATABASE_URL") or self.database_url).strip()
+        # Check if we're in demo mode
+        mode = os.getenv("APP_MODE", self.app_mode).lower()
+        
+        # Select appropriate database URL
+        if mode == "demo":
+            url = (os.getenv("DEMO_DATABASE_URL") or self.demo_database_url).strip()
+        else:
+            url = (os.getenv("DATABASE_URL") or self.database_url).strip()
 
         # If not sqlite just return it
         if not url.startswith("sqlite:///"):
@@ -46,6 +58,21 @@ class Settings(BaseSettings):
     
     # Security
     secret_key: str
+    
+    # Feature Flags
+    enable_plaid_in_demo: bool = False
+    
+    @property
+    def is_demo_mode(self) -> bool:
+        """Check if running in demo mode."""
+        return os.getenv("APP_MODE", self.app_mode).lower() == "demo"
+    
+    @property
+    def plaid_enabled(self) -> bool:
+        """Check if Plaid features should be enabled."""
+        if self.is_demo_mode:
+            return self.enable_plaid_in_demo
+        return True
     
     @property
     def plaid_country_codes_list(self) -> List[str]:

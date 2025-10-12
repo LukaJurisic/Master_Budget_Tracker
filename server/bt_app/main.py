@@ -12,6 +12,7 @@ from .core.scheduler import start_scheduler, stop_scheduler
 from .models import base  # Import to register models
 from .api.routes_root import api_router
 from .api.routes_analytics_freq import router as analytics_freq_router
+from .api.routes_system import router as system_router
 # from .api.routes_ndax import router as ndax_router  # DISABLED - using old integrations router instead
 
 # Configure logging
@@ -87,6 +88,9 @@ app.include_router(api_router, prefix="/api")
 
 # Mount the frequency router under the same prefix the FE expects
 app.include_router(analytics_freq_router, prefix="/api/analytics", tags=["analytics"])
+
+# Mount the system router for app mode and health checks
+app.include_router(system_router, prefix="/api/system", tags=["system"])
 
 # Mount the NDAX router - DISABLED, using old integrations router instead
 # app.include_router(ndax_router)

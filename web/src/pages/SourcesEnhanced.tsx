@@ -6,6 +6,7 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -13,6 +14,7 @@ import { CalendarIcon, RefreshCw, Download, Building2, CreditCard, AlertCircle }
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
+import { useAppMode } from "@/contexts/AppModeContext";
 
 interface PlaidAccount {
   id: number;
@@ -112,6 +114,7 @@ export default function SourcesEnhanced() {
   const [updateLinkToken, setUpdateLinkToken] = useState<string | null>(null);
   const [updateItemId, setUpdateItemId] = useState<number | null>(null);
   const { toast } = useToast();
+  const { isDemo, features } = useAppMode();
 
   useEffect(() => {
     fetchAccounts();
@@ -374,10 +377,27 @@ export default function SourcesEnhanced() {
               Import All
             </Button>
           )}
-          <Button onClick={getLinkToken} disabled={isGettingToken || !!linkToken}>
-            <Building2 className="mr-2 h-4 w-4" />
-            {isGettingToken ? "Getting Token..." : linkToken ? "Token Ready" : "Connect New Bank"}
-          </Button>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span>
+                  <Button 
+                    onClick={getLinkToken} 
+                    disabled={isGettingToken || !!linkToken || !features.plaid_enabled}
+                  >
+                    <Building2 className="mr-2 h-4 w-4" />
+                    {isGettingToken ? "Getting Token..." : linkToken ? "Token Ready" : "Connect New Bank"}
+                  </Button>
+                </span>
+              </TooltipTrigger>
+              {isDemo && !features.plaid_enabled && (
+                <TooltipContent>
+                  <p>🎭 Demo Mode: Bank connections are disabled</p>
+                  <p className="text-xs text-muted-foreground">View existing demo accounts below</p>
+                </TooltipContent>
+              )}
+            </Tooltip>
+          </TooltipProvider>
         </div>
       </div>
 
