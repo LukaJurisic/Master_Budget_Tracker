@@ -9,7 +9,6 @@ from sqlalchemy import text
 import json
 import os
 import inspect
-from fastapi import HTTPException, Depends
 
 from ..services.plaid_service import PlaidService
 from ..services.plaid_import_service import PlaidImportService
@@ -17,6 +16,7 @@ from ..models.institution_item import InstitutionItem
 from ..models.account import Account
 from ..models.plaid_import import PlaidImport
 from ..models.staging_transaction import StagingTransaction
+from ..services.plaid_import_service import to_jsonable
 from .deps import get_database
 
 router = APIRouter(tags=["plaid-enhanced"])
@@ -51,6 +51,13 @@ class ImportRequest(BaseModel):
     start_date: Optional[date] = None
     end_date: Optional[date] = None
     account_ids: Optional[List[str]] = None
+
+class MultiImportRequest(BaseModel):
+    """Request to import from multiple institutions in a single session."""
+    mode: str = "sync"  # "get" or "sync"
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
+    items: List[dict]  # List of {item_id: int, account_ids: List[str]}
 
 class ApproveRequest(BaseModel):
     row_ids: List[int]
@@ -121,24 +128,99 @@ def create_link_token_endpoint(request: LinkTokenRequest, db: Session = Depends(
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+@router.post("/link-token/update/{item_id}")
+def create_update_link_token_endpoint(item_id: int, db: Session = Depends(get_database)):
+    """Create a Plaid Link token in update mode for re-authenticating an existing connection.
+    
+    This is used when a connection expires or requires re-authentication (ITEM_LOGIN_REQUIRED).
+    """
+    try:
+        from ..utils.encryption import decrypt_value
+        
+        # Fetch the institution item to get the access token
+        institution_item = db.query(InstitutionItem).filter(InstitutionItem.id == item_id).first()
+        if not institution_item:
+            raise HTTPException(status_code=404, detail=f"Institution item {item_id} not found")
+        
+        # Decrypt the access token (or use plaintext if not encrypted)
+        # Try decrypting first; if it fails, assume it's plaintext
+        access_token = decrypt_value(institution_item.access_token_encrypted)
+        if access_token is None:
+            # Decryption failed, assume plaintext
+            access_token = institution_item.access_token_encrypted
+            print(f"[UPDATE MODE] Using plaintext access token for item {item_id}")
+        else:
+            print(f"[UPDATE MODE] Decrypted access token for item {item_id}")
+        
+        # Create update-mode link token with the DECRYPTED access token
+        plaid = PlaidService(db)
+        resp = plaid.create_link_token(access_token=access_token)
+        print(f"[UPDATE MODE] Created link token for item {item_id}")
+        return {**resp, "_route": "update-mode", "item_id": item_id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
 @router.post("/exchange")
 @router.post("/public-token/exchange")  # alias
 def exchange_public_token_endpoint(request: ExchangeRequest, db: Session = Depends(get_database)):
-    """Exchange public token for access token and fetch accounts."""
+    """Exchange public token for access token and fetch accounts.
+    
+    ONLY for NEW connections. Update mode should NOT call this endpoint.
+    In update mode, Link refreshes the access token internally; no exchange needed.
+    """
     try:
         plaid_service = PlaidService(db)
         result = plaid_service.exchange_public_token(request.public_token)
         
-        # Save institution item
-        institution_item = InstitutionItem(
-            institution_name="Connected Institution",
-            plaid_item_id=result["item_id"],
-            access_token_encrypted=result["access_token"]
-        )
-        db.add(institution_item)
+        # Check if this item_id already exists (should NOT happen in proper flow)
+        existing_item = db.query(InstitutionItem).filter_by(plaid_item_id=result["item_id"]).first()
+        
+        if existing_item:
+            # This means the frontend called /exchange during update mode (incorrect)
+            # Return 200 no-op to avoid breaking the flow, but log a warning
+            print(f"[EXCHANGE] WARNING: /exchange called for existing item {existing_item.id}")
+            print(f"[EXCHANGE] This should not happen. Frontend should skip /exchange in update mode.")
+            print(f"[EXCHANGE] Returning existing item as no-op")
+            
+            # Fetch accounts for consistency
+            from plaid.model.accounts_get_request import AccountsGetRequest
+            from ..services.plaid_import_service import PlaidImportService
+            
+            service = PlaidImportService(db)
+            accounts_request = AccountsGetRequest(access_token=result["access_token"])
+            accounts_response = service.client.accounts_get(accounts_request)
+            
+            account_data = [
+                {
+                    "id": acc.account_id,
+                    "name": acc.name,
+                    "type": acc.type.value if acc.type else None,
+                    "mask": acc.mask
+                }
+                for acc in accounts_response.accounts
+            ]
+            
+            return {
+                "item_id": existing_item.id,
+                "accounts": account_data,
+                "message": "Connection already exists (no-op)"
+            }
+        else:
+            # New connection: create a new institution item
+            print(f"[EXCHANGE] Creating new institution item for plaid_item_id {result['item_id']}")
+            institution_item = InstitutionItem(
+                institution_name="Connected Institution",
+                plaid_item_id=result["item_id"],
+                access_token_encrypted=result["access_token"]
+            )
+            db.add(institution_item)
+            message = "Account linked successfully"
+        
         db.flush()
         
-        # Fetch and save accounts
+        # Fetch and save/update accounts
         from plaid.model.accounts_get_request import AccountsGetRequest
         from ..services.plaid_import_service import PlaidImportService
         
@@ -148,17 +230,33 @@ def exchange_public_token_endpoint(request: ExchangeRequest, db: Session = Depen
         
         account_data = []
         for acc in accounts_response.accounts:
-            account = Account(
+            # Check if account already exists (update mode)
+            existing_account = db.query(Account).filter_by(
                 institution_item_id=institution_item.id,
-                plaid_account_id=acc.account_id,
-                name=acc.name,
-                mask=acc.mask,
-                official_name=acc.official_name,
-                currency=acc.balances.iso_currency_code or "USD",
-                account_type=acc.type.value if acc.type else None,
-                is_enabled_for_import=True
-            )
-            db.add(account)
+                plaid_account_id=acc.account_id
+            ).first()
+            
+            if existing_account:
+                # Update existing account
+                existing_account.name = acc.name
+                existing_account.mask = acc.mask
+                existing_account.official_name = acc.official_name
+                existing_account.currency = acc.balances.iso_currency_code or "USD"
+                existing_account.account_type = acc.type.value if acc.type else None
+            else:
+                # Create new account
+                account = Account(
+                    institution_item_id=institution_item.id,
+                    plaid_account_id=acc.account_id,
+                    name=acc.name,
+                    mask=acc.mask,
+                    official_name=acc.official_name,
+                    currency=acc.balances.iso_currency_code or "USD",
+                    account_type=acc.type.value if acc.type else None,
+                    is_enabled_for_import=True
+                )
+                db.add(account)
+            
             account_data.append({
                 "id": acc.account_id,
                 "name": acc.name,
@@ -171,10 +269,11 @@ def exchange_public_token_endpoint(request: ExchangeRequest, db: Session = Depen
         return {
             "item_id": institution_item.id,
             "accounts": account_data,
-            "message": "Account linked successfully"
+            "message": message
         }
     except Exception as e:
         db.rollback()
+        print(f"[EXCHANGE] Error: {e}")
         raise HTTPException(status_code=400, detail=str(e))
 
 @router.post("/test-simple")
@@ -307,6 +406,93 @@ def import_transactions(body: dict = Body(...), db: Session = Depends(get_databa
         start_date=start_date,
         end_date=end_date,
     )
+
+@router.post("/import-multi")
+def import_multi(body: dict = Body(...), db: Session = Depends(get_database)):
+    """Import transactions from multiple institutions in a single session."""
+    service = PlaidImportService(db)
+    
+    mode = body.get("mode", "sync")
+    start_date = _parse_date(body.get("start_date"))
+    end_date = _parse_date(body.get("end_date"))
+    items = body.get("items", [])
+    
+    if not items:
+        raise HTTPException(status_code=400, detail="No items provided for import")
+    
+    # Create a single import session for all institutions
+    # We'll use the first item's ID as the primary, but track all in metadata
+    first_item_id = int(items[0]["item_id"])
+    
+    # Create import record with metadata about all items
+    plaid_import = PlaidImport(
+        item_id=first_item_id,  # Primary item for backwards compatibility
+        start_date=start_date,
+        end_date=end_date,
+        mode=mode,
+        created_by="system"
+    )
+    db.add(plaid_import)
+    db.flush()
+    
+    all_transactions = []
+    all_account_ids = []
+    item_names = []
+    
+    # Process each institution
+    for item_data in items:
+        item_id = int(item_data["item_id"])
+        account_ids = item_data.get("account_ids", [])
+        
+        # Get institution item
+        item = db.query(InstitutionItem).filter(InstitutionItem.id == item_id).first()
+        if not item:
+            continue
+            
+        item_names.append(item.institution_name)
+        all_account_ids.extend(account_ids)
+        
+        # Fetch transactions based on mode
+        if mode == "sync":
+            sync_result = service._fetch_transactions_sync(
+                item.access_token_encrypted,
+                item.next_cursor,
+                account_ids
+            )
+            transactions = sync_result["added"] + sync_result["modified"]
+            # Update cursor
+            item.next_cursor = sync_result["next_cursor"]
+        else:  # date range mode
+            transactions = service._fetch_transactions_get(
+                item.access_token_encrypted,
+                start_date,
+                end_date,
+                account_ids
+            )
+        
+        all_transactions.extend(transactions)
+    
+    # Stage all transactions together
+    summary = service._stage_transactions(
+        plaid_import.id, 
+        all_transactions, 
+        all_account_ids if all_account_ids else None,
+        start_date,
+        end_date
+    )
+    
+    # Update import summary with multi-institution info
+    summary["institution_names"] = item_names
+    summary["institution_count"] = len(items)
+    plaid_import.summary_json = json.dumps(to_jsonable(summary))
+    db.commit()
+    
+    return {
+        "import_id": plaid_import.id,
+        "counts": summary,
+        "institutions": item_names,
+        "mode": mode
+    }
 
 @router.get("/imports/{import_id}/staging")
 def get_staging_transactions(

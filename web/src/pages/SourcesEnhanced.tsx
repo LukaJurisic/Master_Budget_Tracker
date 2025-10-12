@@ -108,6 +108,9 @@ export default function SourcesEnhanced() {
   });
   const [selectedAccounts, setSelectedAccounts] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [showAccountSelection, setShowAccountSelection] = useState(false);
+  const [updateLinkToken, setUpdateLinkToken] = useState<string | null>(null);
+  const [updateItemId, setUpdateItemId] = useState<number | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -174,7 +177,26 @@ export default function SourcesEnhanced() {
   };
 
   const handleSuccess = async (public_token: string) => {
+    // Check if we're in update mode (re-authentication)
+    const isUpdateMode = updateLinkToken !== null;
+    
+    if (isUpdateMode) {
+      // Update mode: DO NOT call /exchange
+      // Plaid internally refreshes the access token; we just need to mark success
+      console.log('[UPDATE MODE] Re-authentication successful, skipping /exchange');
+      toast({
+        title: "Re-authenticated",
+        description: "Connection refreshed successfully"
+      });
+      fetchAccounts();
+      setUpdateLinkToken(null);
+      setUpdateItemId(null);
+      return;
+    }
+    
+    // New connection mode: call /exchange
     try {
+      console.log('[CONNECT MODE] Exchanging public token for new connection');
       const response = await fetch("/api/plaid/exchange", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -196,6 +218,37 @@ export default function SourcesEnhanced() {
         description: "Failed to exchange token",
         variant: "destructive"
       });
+    }
+  };
+
+  const getUpdateLinkToken = async (itemId: number) => {
+    try {
+      setIsGettingToken(true);
+      // Clear any existing link tokens to prevent conflicts
+      setLinkToken(null);
+      
+      console.log(`Fetching update link token for item ${itemId}...`);
+      const response = await fetch(`/api/plaid/link-token/update/${itemId}`, {
+        method: "POST"
+      });
+      
+      if (response.ok) {
+        const { link_token } = await response.json();
+        console.log('Got update link token');
+        setUpdateLinkToken(link_token);
+        setUpdateItemId(itemId);
+      } else {
+        throw new Error(`Failed to fetch update link token: ${response.status}`);
+      }
+    } catch (error) {
+      console.error('Update link token error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create update link token",
+        variant: "destructive"
+      });
+    } finally {
+      setIsGettingToken(false);
     }
   };
 
@@ -303,17 +356,59 @@ export default function SourcesEnhanced() {
             Connect your bank accounts and manage data imports
           </p>
         </div>
-        <Button onClick={getLinkToken} disabled={isGettingToken || !!linkToken}>
-          <Building2 className="mr-2 h-4 w-4" />
-          {isGettingToken ? "Getting Token..." : linkToken ? "Token Ready" : "Connect New Bank"}
-        </Button>
+        <div className="flex gap-2">
+          {accounts.length > 0 && (
+            <Button 
+              onClick={() => {
+                // Pre-select all enabled accounts across all institutions
+                const allEnabledAccounts = accounts
+                  .filter(acc => acc.is_enabled_for_import)
+                  .map(acc => acc.plaid_account_id);
+                setSelectedAccounts(allEnabledAccounts);
+                setImportMode("sync");
+                setIsImportModalOpen(true);
+              }}
+              variant="default"
+            >
+              <Download className="mr-2 h-4 w-4" />
+              Import All
+            </Button>
+          )}
+          <Button onClick={getLinkToken} disabled={isGettingToken || !!linkToken}>
+            <Building2 className="mr-2 h-4 w-4" />
+            {isGettingToken ? "Getting Token..." : linkToken ? "Token Ready" : "Connect New Bank"}
+          </Button>
+        </div>
       </div>
 
-      {linkToken && <PlaidLinkComponent token={linkToken} onSuccess={handleSuccess} onExit={() => setLinkToken(null)} />}
+      {/* Ensure only ONE PlaidLink instance renders at a time */}
+      {updateLinkToken && updateItemId ? (
+        <div className="p-4 border rounded-lg bg-amber-50 border-amber-200">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5" />
+            <div className="flex-1">
+              <h3 className="font-medium text-amber-900 mb-1">Re-authentication Required</h3>
+              <p className="text-sm text-amber-800 mb-3">
+                Your bank connection needs to be updated. This happens when your login credentials change or when additional verification is required.
+              </p>
+              <PlaidLinkComponent 
+                token={updateLinkToken} 
+                onSuccess={handleSuccess} 
+                onExit={() => {
+                  setUpdateLinkToken(null);
+                  setUpdateItemId(null);
+                }} 
+              />
+            </div>
+          </div>
+        </div>
+      ) : linkToken ? (
+        <PlaidLinkComponent token={linkToken} onSuccess={handleSuccess} onExit={() => setLinkToken(null)} />
+      ) : null}
 
       {/* Debug info */}
       <div className="text-xs text-muted-foreground">
-        Debug: linkToken = {linkToken ? 'SET' : 'NULL'}, isGettingToken = {isGettingToken.toString()}
+        Debug: linkToken = {linkToken ? 'SET' : 'NULL'}, updateLinkToken = {updateLinkToken ? 'SET' : 'NULL'}, isGettingToken = {isGettingToken.toString()}
       </div>
 
       {/* Connected Accounts */}
@@ -330,8 +425,22 @@ export default function SourcesEnhanced() {
                   <Button
                     variant="outline"
                     size="sm"
+                    onClick={() => getUpdateLinkToken(Number(itemId))}
+                    disabled={isGettingToken}
+                    title="Re-authenticate this bank connection"
+                  >
+                    <AlertCircle className="mr-2 h-4 w-4" />
+                    Re-authenticate
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
                     onClick={() => {
-                      setSelectedInstitution(Number(itemId));
+                      // Pre-select only this institution's enabled accounts
+                      const institutionAccounts = institution.accounts
+                        .filter(acc => acc.is_enabled_for_import)
+                        .map(acc => acc.plaid_account_id);
+                      setSelectedAccounts(institutionAccounts);
                       setImportMode("sync");
                       setIsImportModalOpen(true);
                     }}
@@ -343,7 +452,11 @@ export default function SourcesEnhanced() {
                     variant="outline"
                     size="sm"
                     onClick={() => {
-                      setSelectedInstitution(Number(itemId));
+                      // Pre-select only this institution's enabled accounts
+                      const institutionAccounts = institution.accounts
+                        .filter(acc => acc.is_enabled_for_import)
+                        .map(acc => acc.plaid_account_id);
+                      setSelectedAccounts(institutionAccounts);
                       setImportMode("date-range");
                       setIsImportModalOpen(true);
                     }}
@@ -437,22 +550,45 @@ export default function SourcesEnhanced() {
       )}
 
       {/* Import Modal */}
-      <Dialog open={isImportModalOpen} onOpenChange={setIsImportModalOpen}>
-        <DialogContent className="sm:max-w-[500px]">
+      <Dialog open={isImportModalOpen} onOpenChange={(open) => {
+        setIsImportModalOpen(open);
+        if (!open) {
+          setSelectedInstitution(null);
+          setSelectedAccounts([]);
+          setShowAccountSelection(false);
+        }
+      }}>
+        <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
             <DialogTitle>
-              {importMode === "sync" ? "Sync New Transactions" : "Import by Date Range"}
+              Import Transactions
             </DialogTitle>
             <DialogDescription>
-              {importMode === "sync" 
-                ? "Fetch new transactions since the last sync"
-                : "Import transactions for a specific date range"
-              }
+              Select banks and accounts to import transactions from
             </DialogDescription>
           </DialogHeader>
 
-          {importMode === "date-range" && (
-            <div className="space-y-4">
+          <div className="space-y-4">
+            {/* Import Mode Selection */}
+            <div className="flex gap-2">
+              <Button
+                variant={importMode === "sync" ? "default" : "outline"}
+                onClick={() => setImportMode("sync")}
+                className="flex-1"
+              >
+                Sync New
+              </Button>
+              <Button
+                variant={importMode === "date-range" ? "default" : "outline"}
+                onClick={() => setImportMode("date-range")}
+                className="flex-1"
+              >
+                Date Range
+              </Button>
+            </div>
+
+            {/* Date Range Selection */}
+            {importMode === "date-range" && (
               <div className="flex gap-2">
                 <Popover>
                   <PopoverTrigger asChild>
@@ -500,35 +636,103 @@ export default function SourcesEnhanced() {
                   </PopoverContent>
                 </Popover>
               </div>
-            </div>
-          )}
+            )}
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Account Filter (optional)</label>
-            <div className="space-y-2">
-              {selectedInstitution && accountsByInstitution[selectedInstitution]?.accounts
-                .filter(acc => acc.is_enabled_for_import)
-                .map((account) => (
-                  <div key={account.plaid_account_id} className="flex items-center space-x-2">
-                    <Checkbox
-                      id={account.plaid_account_id}
-                      checked={selectedAccounts.includes(account.plaid_account_id)}
-                      onCheckedChange={(checked) => {
-                        if (checked) {
-                          setSelectedAccounts([...selectedAccounts, account.plaid_account_id]);
-                        } else {
-                          setSelectedAccounts(selectedAccounts.filter(id => id !== account.plaid_account_id));
-                        }
-                      }}
-                    />
-                    <label
-                      htmlFor={account.plaid_account_id}
-                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                    >
-                      {account.name} (****{account.mask})
-                    </label>
+            {/* Master Selection Controls */}
+            <div className="flex items-center justify-between p-3 rounded-lg border bg-muted/50">
+              <span className="text-sm font-medium">Select Accounts to Import</span>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    // Select all enabled accounts across all institutions
+                    const allEnabledAccounts = accounts
+                      .filter(acc => acc.is_enabled_for_import)
+                      .map(acc => acc.plaid_account_id);
+                    setSelectedAccounts(allEnabledAccounts);
+                  }}
+                >
+                  Select All
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSelectedAccounts([])}
+                >
+                  Clear All
+                </Button>
+              </div>
+            </div>
+
+            {/* Accounts by Institution */}
+            <div className="space-y-3 max-h-[300px] overflow-y-auto">
+              {Object.entries(accountsByInstitution).map(([itemId, institution]) => {
+                const enabledAccounts = institution.accounts.filter(acc => acc.is_enabled_for_import);
+                const institutionSelected = enabledAccounts.every(acc => 
+                  selectedAccounts.includes(acc.plaid_account_id)
+                );
+                const institutionPartiallySelected = enabledAccounts.some(acc => 
+                  selectedAccounts.includes(acc.plaid_account_id)
+                ) && !institutionSelected;
+
+                return (
+                  <div key={itemId} className="space-y-2 p-3 rounded-lg border">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`institution-${itemId}`}
+                        checked={institutionSelected}
+                        indeterminate={institutionPartiallySelected}
+                        onCheckedChange={(checked) => {
+                          const institutionAccountIds = enabledAccounts.map(acc => acc.plaid_account_id);
+                          if (checked) {
+                            setSelectedAccounts(prev => [...new Set([...prev, ...institutionAccountIds])]);
+                          } else {
+                            setSelectedAccounts(prev => prev.filter(id => !institutionAccountIds.includes(id)));
+                          }
+                        }}
+                      />
+                      <label
+                        htmlFor={`institution-${itemId}`}
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                      >
+                        {institution.name}
+                      </label>
+                    </div>
+                    <div className="ml-6 space-y-2">
+                      {enabledAccounts.map((account) => (
+                        <div key={account.plaid_account_id} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={account.plaid_account_id}
+                            checked={selectedAccounts.includes(account.plaid_account_id)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setSelectedAccounts([...selectedAccounts, account.plaid_account_id]);
+                              } else {
+                                setSelectedAccounts(selectedAccounts.filter(id => id !== account.plaid_account_id));
+                              }
+                            }}
+                          />
+                          <label
+                            htmlFor={account.plaid_account_id}
+                            className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                          >
+                            {account.name} (****{account.mask})
+                          </label>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                ))}
+                );
+              })}
+            </div>
+
+            {/* Status Message */}
+            <div className="text-sm text-muted-foreground">
+              {selectedAccounts.length === 0 
+                ? "No accounts selected. All enabled accounts will be imported."
+                : `${selectedAccounts.length} account${selectedAccounts.length === 1 ? '' : 's'} selected for import`
+              }
             </div>
           </div>
 
@@ -536,9 +740,94 @@ export default function SourcesEnhanced() {
             <Button variant="outline" onClick={() => setIsImportModalOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleImport} disabled={isLoading}>
+            <Button 
+              onClick={async () => {
+                // Handle multiple institutions in a single import session
+                if (selectedAccounts.length === 0) {
+                  toast({ 
+                    title: "No accounts selected", 
+                    description: "Please select at least one account to import",
+                    variant: "destructive" 
+                  });
+                  return;
+                }
+
+                // Group selected accounts by institution
+                const institutionGroups = new Map<number, string[]>();
+                accounts
+                  .filter(acc => selectedAccounts.includes(acc.plaid_account_id))
+                  .forEach(acc => {
+                    if (!institutionGroups.has(acc.institution_item_id)) {
+                      institutionGroups.set(acc.institution_item_id, []);
+                    }
+                    institutionGroups.get(acc.institution_item_id)?.push(acc.plaid_account_id);
+                  });
+
+                setIsLoading(true);
+
+                try {
+                  // Build items array for multi-import
+                  const items = Array.from(institutionGroups.entries()).map(([itemId, accountIds]) => ({
+                    item_id: itemId,
+                    account_ids: accountIds
+                  }));
+
+                  const payload = {
+                    mode: importMode === "date-range" ? "get" : "sync",
+                    items: items,
+                    start_date: importMode === "date-range" && dateRange.from ? format(dateRange.from, "yyyy-MM-dd") : null,
+                    end_date: importMode === "date-range" && dateRange.to ? format(dateRange.to, "yyyy-MM-dd") : null
+                  };
+
+                  console.log("[MULTI-IMPORT] payload", payload);
+
+                  const r = await fetch(API("/api/plaid/import-multi"), {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload),
+                  });
+
+                  const raw = await r.text();
+                  console.log("[MULTI-IMPORT] raw response:", raw);
+                  let j: any = {};
+                  try { 
+                    j = raw ? JSON.parse(raw) : {}; 
+                  } catch (e) {
+                    console.error("[MULTI-IMPORT] Failed to parse JSON:", e);
+                  }
+
+                  if (!r.ok) {
+                    const msg = j?.detail?.message || j?.detail?.error_message || j?.error_message || raw || "Import failed";
+                    throw new Error(msg);
+                  }
+
+                  const c = j.counts || {};
+                  const institutions = j.institutions || [];
+                  toast({ 
+                    title: "Import completed", 
+                    description: `Staged ${c.total ?? 0} transactions from ${institutions.length} institution${institutions.length === 1 ? '' : 's'} • Ready: ${c.ready ?? 0} • Need mapping: ${c.needs_category ?? 0}` 
+                  });
+
+                  if (!j.import_id) throw new Error("Import succeeded but no import_id in response");
+                  
+                  setIsImportModalOpen(false);
+                  window.location.assign(`/mapping?tab=staging&importId=${encodeURIComponent(j.import_id)}`);
+                  
+                } catch (err: any) {
+                  console.error("[MULTI-IMPORT] Error:", err);
+                  toast({ 
+                    title: "Import failed", 
+                    description: err?.message ?? String(err),
+                    variant: "destructive" 
+                  });
+                } finally {
+                  setIsLoading(false);
+                }
+              }} 
+              disabled={isLoading || selectedAccounts.length === 0}
+            >
               {isLoading && <RefreshCw className="mr-2 h-4 w-4 animate-spin" />}
-              {importMode === "sync" ? "Sync Transactions" : "Import Transactions"}
+              Import Selected Accounts
             </Button>
           </DialogFooter>
         </DialogContent>

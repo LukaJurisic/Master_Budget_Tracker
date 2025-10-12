@@ -52,8 +52,13 @@ class PlaidService:
         self.db = db
         self.client = get_plaid_client()  # Use the lazy-loaded client with correct environment
     
-    def create_link_token(self, user_id: str = "user-1") -> Dict[str, str]:
-        """Create a one-time Link token for the frontend."""
+    def create_link_token(self, user_id: str = "user-1", access_token: Optional[str] = None) -> Dict[str, str]:
+        """Create a one-time Link token for the frontend.
+        
+        Args:
+            user_id: Unique user identifier
+            access_token: If provided, creates an update-mode token for re-authentication
+        """
         import json
         from uuid import uuid4
         from plaid.exceptions import ApiException
@@ -68,14 +73,21 @@ class PlaidService:
         client_user_id = os.environ.get("LINK_CLIENT_USER_ID") or user_id or str(uuid4())
         redirect_uri = os.environ.get("PLAID_REDIRECT_URI") or None  # REQUIRED for some OAuth institutions in prod
         
-        # Only include redirect_uri if it's set
+        # Build request parameters
         req_params = {
             "user": LinkTokenCreateRequestUser(client_user_id=client_user_id),
             "client_name": "Budget Tracker",
-            "products": [Products("transactions")],
             "country_codes": [CountryCode("CA"), CountryCode("US")],
             "language": "en",
         }
+        
+        # If access_token provided, this is an update-mode token for re-authentication
+        if access_token:
+            req_params["access_token"] = access_token
+            print(f"[PLAID] Creating update-mode link token for re-authentication")
+        else:
+            # New connection - include products
+            req_params["products"] = [Products("transactions")]
         
         if redirect_uri:
             req_params["redirect_uri"] = redirect_uri
