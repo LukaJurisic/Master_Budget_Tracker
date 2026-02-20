@@ -4,7 +4,7 @@
 Write-Host "🎭 Starting Budget Tracker in DEMO MODE..." -ForegroundColor Magenta
 Write-Host ("=" * 60)
 
-cd $PSScriptRoot
+cd $PSScriptRoot\..\..\
 
 # Check if demo.db exists
 $demoDbPath = ".\bt_app\demo.db"

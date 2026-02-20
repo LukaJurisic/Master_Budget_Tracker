@@ -345,10 +345,10 @@ def get_recurring_subscriptions(
     date_to: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
     db: Session = Depends(get_database)
 ):
-    """Get recurring subscription transactions."""
+    """Get recurring subscription transactions with improved price evolution tracking."""
     from sqlalchemy import text
     import datetime as dt
-    from collections import defaultdict
+    from collections import defaultdict, Counter
     
     # Get actual date range from database if not provided
     if not date_from or not date_to:
@@ -366,8 +366,7 @@ def get_recurring_subscriptions(
         if not date_to:
             date_to = date_range_result.max_date or "2025-12-31"
     
-    # Pre-process grouping: Create canonical merchant keys BEFORE aggregation
-    # This ensures merchants that change names get grouped together
+    # Query to get monthly charges per canonical merchant with chronological data
     query = text("""
         WITH merchant_normalized AS (
             SELECT 
@@ -376,48 +375,50 @@ def get_recurring_subscriptions(
                 t.posted_date,
                 t.amount,
                 c.name as category_name,
-                -- Create canonical merchant key that groups variations together
-                CASE 
-                    -- OPENAI patterns: STRIPE + OPENAI desc OR direct OpenAI merchant
+                -- Create canonical merchant key that groups variations together (UPPERCASE for consistency)
+                UPPER(CASE 
+                    -- OPENAI patterns
                     WHEN (t.merchant_raw = 'ONLINE PAYMENTS BY STRIPE' AND t.description_raw LIKE '%OPENAI%') 
                       OR (t.merchant_raw = 'ONLINE PAYMENTS BY STRIPE' AND t.description_raw LIKE '%CHATGPT%')
                       OR UPPER(t.merchant_raw) LIKE '%OPENAI%' THEN 'OPENAI'
                     
-                    -- CURSOR patterns: STRIPE + CURSOR desc OR direct Cursor merchant  
+                    -- CURSOR patterns
                     WHEN (t.merchant_raw = 'ONLINE PAYMENTS BY STRIPE' AND t.description_raw LIKE '%CURSOR%')
                       OR UPPER(t.merchant_raw) LIKE '%CURSOR%' THEN 'CURSOR'
                     
-                    -- TRADINGVIEW patterns: B2B + TRADINGVIEW desc OR direct Tradingview merchant
+                    -- TRADINGVIEW patterns
                     WHEN (t.merchant_raw = 'B2B TRANSACTION' AND t.description_raw LIKE '%TRADINGVIEW%')
                       OR UPPER(t.merchant_raw) LIKE '%TRADINGVIEW%' THEN 'TRADINGVIEW'
                     
-                    -- LEETCODE patterns: STRIPE + LEETCODE desc
+                    -- LEETCODE patterns
                     WHEN (t.merchant_raw = 'ONLINE PAYMENTS BY STRIPE' AND t.description_raw LIKE '%LEETCODE%')
                       OR UPPER(t.merchant_raw) LIKE '%LEETCODE%' THEN 'LEETCODE'
                     
-                    -- NETFLIX patterns: All Netflix variations
+                    -- NETFLIX patterns
                     WHEN UPPER(t.merchant_raw) LIKE '%NETFLIX%' 
                       OR t.description_raw LIKE '%NETFLIX%' THEN 'NETFLIX'
                     
-                    -- MEMBERSHIP FEE patterns: All membership fee variations and related patterns  
+                    -- EQUINOX patterns (case-insensitive)
+                    WHEN UPPER(t.merchant_raw) LIKE '%EQUINOX%' THEN 'EQUINOX'
+                    
+                    -- MEMBERSHIP FEE patterns
                     WHEN UPPER(t.merchant_raw) LIKE '%MEMBERSHIP FEE%'
                       OR (t.merchant_raw = 'CHECKOUT.COM ECOMM MEDIUM EEA' AND t.description_raw LIKE '%PATREON% MEMBERSHIP%')
                       OR (UPPER(t.merchant_raw) LIKE '%INTEREST%' AND t.description_raw LIKE '%MEMBERSHIP FEE%') THEN 'MEMBERSHIP_FEE'
                     
-                    -- FIDO patterns: All Fido variations (FIDO, FIDO MACC, NEW MERCHANT with Fido description)
+                    -- FIDO patterns
                     WHEN UPPER(t.merchant_raw) LIKE '%FIDO%' 
                       OR (t.merchant_raw = 'NEW MERCHANT' AND t.description_raw LIKE '%FIDO MOBILE%')
                       OR t.description_raw LIKE '%FIDO MOBILE%' THEN 'FIDO'
                     
-                    -- BELL CANADA patterns: All Bell Canada variations
+                    -- BELL CANADA patterns
                     WHEN UPPER(t.merchant_raw) LIKE '%BELL CANADA%'
-                      OR UPPER(t.merchant_raw) LIKE '%BELL%' AND t.description_raw LIKE '%BELL CANADA%' THEN 'BELL_CANADA'
+                      OR (UPPER(t.merchant_raw) LIKE '%BELL%' AND t.description_raw LIKE '%BELL CANADA%') THEN 'BELL_CANADA'
                     
-                    -- Default: use merchant_raw as-is
-                    ELSE t.merchant_raw
-                END as canonical_merchant,
+                    -- Default: use UPPER of merchant_raw for consistency
+                    ELSE UPPER(t.merchant_raw)
+                END) as canonical_merchant,
                 
-                -- For display, prefer the most recent merchant name
                 t.merchant_raw as display_merchant
             FROM transactions t
             LEFT JOIN categories c ON t.category_id = c.id
@@ -433,7 +434,7 @@ def get_recurring_subscriptions(
                 strftime('%Y-%m', posted_date) as month,
                 COUNT(*) as transaction_count,
                 SUM(ABS(amount)) as monthly_total,
-                AVG(ABS(amount)) as avg_amount,
+                AVG(ABS(amount)) as avg_transaction_amount,
                 MIN(posted_date) as first_date_in_month,
                 MAX(posted_date) as last_date_in_month,
                 MAX(category_name) as category_name,
@@ -441,26 +442,20 @@ def get_recurring_subscriptions(
                 MAX(description_raw) as latest_description
             FROM merchant_normalized
             GROUP BY canonical_merchant, strftime('%Y-%m', posted_date)
-        ),
-        merchant_summary AS (
-            SELECT 
-                canonical_merchant,
-                MAX(latest_display_merchant) as display_merchant_name,
-                MAX(latest_description) as description_raw,
-                COUNT(DISTINCT month) as months_count,
-                SUM(monthly_total) as total_charged,
-                AVG(avg_amount) as typical_amount,
-                MIN(first_date_in_month) as first_date,
-                MAX(last_date_in_month) as last_date,
-                MAX(category_name) as category_name,
-                GROUP_CONCAT(DISTINCT ROUND(avg_amount, 2)) as price_points
-            FROM monthly_charges
-            GROUP BY canonical_merchant
-            HAVING months_count >= 1
         )
-        SELECT *
-        FROM merchant_summary
-        ORDER BY months_count DESC, total_charged DESC
+        SELECT 
+            canonical_merchant,
+            month,
+            monthly_total,
+            avg_transaction_amount,
+            transaction_count,
+            first_date_in_month,
+            last_date_in_month,
+            category_name,
+            latest_display_merchant,
+            latest_description
+        FROM monthly_charges
+        ORDER BY canonical_merchant, month
     """)
     
     results = db.execute(query, {
@@ -468,12 +463,26 @@ def get_recurring_subscriptions(
         "date_to": date_to
     }).fetchall()
     
-    # Process results - much simpler now since SQL already groups by canonical merchant
+    # Group monthly data by merchant
+    merchant_monthly_data = defaultdict(list)
+    for row in results:
+        merchant_monthly_data[row.canonical_merchant].append({
+            'month': row.month,
+            'amount': round(float(row.monthly_total), 2),  # Total for the month (for calculating total_charged)
+            'avg_amount': round(float(row.avg_transaction_amount), 2),  # Per-transaction average (for price evolution)
+            'txn_count': row.transaction_count,
+            'first_date': row.first_date_in_month,
+            'last_date': row.last_date_in_month,
+            'category': row.category_name,
+            'display_name': row.latest_display_merchant
+        })
+    
+    # Process results
     subscriptions = []
     current_date = dt.datetime.now().date()
-    cutoff_date = current_date - dt.timedelta(days=90)  # Consider current if charged in last 90 days
+    cutoff_date = current_date - dt.timedelta(days=45)  # Reduced to 45 days for better inactive detection
     
-    # Whitelist patterns for canonical merchants (already normalized by SQL)
+    # Whitelist patterns for canonical merchants (UPPERCASE)
     whitelisted_merchants = {
         'TRADINGVIEW', 'EQUINOX', 'NETFLIX', 'SPOTIFY', 'APPLE', 'GOOGLE', 
         'CURSOR', 'LEETCODE', 'OPENAI', 'BELL_CANADA', 'FIDO', 'ROGERS', 'TELUS', 
@@ -500,18 +509,111 @@ def get_recurring_subscriptions(
         'AMAZONCOM PAYMENTS-CA', 'AMAZON', 'BEST BUY'
     }
     
-    # Debug output
-    print(f"Debug: SQL returned {len(results)} canonical merchant groups")
-    
-    # Process each canonical merchant group
-    for row in results:
-        canonical_merchant = row.canonical_merchant
-        display_name = row.display_merchant_name or canonical_merchant
-        category_name = row.category_name or "Subscription"
+    def calculate_stable_price(monthly_data):
+        """
+        Calculate the stable recurring price.
+        Uses mode of recent 6 months' per-transaction average, ignoring one-off spikes.
+        A price needs 2+ consecutive months to be considered 'stable'.
+        """
+        if not monthly_data:
+            return 0
         
-        # Debug key merchants
-        if any(term in canonical_merchant.upper() for term in ['OPENAI', 'CURSOR', 'TRADINGVIEW', 'LEETCODE', 'EQUINOX']):
-            print(f"Debug: canonical_merchant='{canonical_merchant}', display='{display_name}', months={row.months_count}, first={row.first_date}, last={row.last_date}")
+        # Get last 6 months of data - use avg_amount (per-transaction) not total
+        recent_data = monthly_data[-6:]
+        amounts = [d['avg_amount'] for d in recent_data]
+        
+        if len(amounts) == 1:
+            return amounts[0]
+        
+        # Round to nearest dollar for grouping (to handle small variations like $49.13, $49.30)
+        rounded_amounts = [round(a) for a in amounts]
+        
+        # Find the most common rounded amount
+        amount_counts = Counter(rounded_amounts)
+        most_common_rounded = amount_counts.most_common(1)[0][0]
+        
+        # Get the actual amounts that round to this value
+        matching_amounts = [a for a, r in zip(amounts, rounded_amounts) if r == most_common_rounded]
+        
+        # Return the average of matching amounts
+        return round(sum(matching_amounts) / len(matching_amounts), 2)
+    
+    def calculate_price_evolution(monthly_data):
+        """
+        Calculate chronological price evolution based on per-transaction amount.
+        Only shows stable price changes - a price must appear 2+ consecutive months 
+        to be considered a 'price point'. One-off variations are ignored.
+        Uses avg_amount (per-transaction) instead of monthly_total to avoid
+        showing inflated amounts when multiple transactions occur in same month.
+        """
+        if len(monthly_data) < 3:
+            return None
+        
+        # Find stable price periods (2+ consecutive months at same rounded price)
+        stable_periods = []
+        current_price = None
+        consecutive_count = 0
+        period_start_month = None
+        
+        for data in monthly_data:
+            # Use avg_amount (per-transaction) for price comparison
+            rounded_price = round(data['avg_amount'])
+            
+            if current_price is None or abs(rounded_price - current_price) <= 3:
+                # Same price (within $3 tolerance for minor variations)
+                if current_price is None:
+                    current_price = rounded_price
+                    period_start_month = data['month']
+                consecutive_count += 1
+            else:
+                # Price changed - save previous period if it was stable (2+ months)
+                if consecutive_count >= 2:
+                    stable_periods.append({
+                        'price': current_price,
+                        'month': period_start_month,
+                        'duration': consecutive_count
+                    })
+                
+                # Start new period
+                current_price = rounded_price
+                period_start_month = data['month']
+                consecutive_count = 1
+        
+        # Don't forget the last period
+        if consecutive_count >= 2:
+            stable_periods.append({
+                'price': current_price,
+                'month': period_start_month,
+                'duration': consecutive_count
+            })
+        
+        if len(stable_periods) <= 1:
+            return None
+        
+        # Return prices in chronological order, avoiding duplicates
+        seen_prices = set()
+        evolution = []
+        for period in stable_periods:
+            if period['price'] not in seen_prices:
+                evolution.append(float(period['price']))
+                seen_prices.add(period['price'])
+        
+        return evolution if len(evolution) > 1 else None
+    
+    # Process each merchant
+    for canonical_merchant, monthly_data in merchant_monthly_data.items():
+        if not monthly_data:
+            continue
+        
+        # Sort by month chronologically
+        monthly_data.sort(key=lambda x: x['month'])
+        
+        display_name = monthly_data[-1]['display_name'] or canonical_merchant
+        category_name = monthly_data[-1]['category'] or "Subscription"
+        first_date = monthly_data[0]['first_date']
+        last_date = monthly_data[-1]['last_date']
+        months_count = len(monthly_data)
+        total_charged = sum(d['amount'] for d in monthly_data)
         
         # Check if whitelisted
         is_whitelisted = canonical_merchant.upper() in whitelisted_merchants
@@ -538,33 +640,28 @@ def get_recurring_subscriptions(
                 continue
             
             # Require at least 3 months for non-whitelisted
-            if row.months_count < 3:
+            if months_count < 3:
                 continue
         
-        # Check if subscription is current
-        last_date = dt.datetime.strptime(row.last_date, "%Y-%m-%d").date()
-        is_current = last_date >= cutoff_date
+        # Check if subscription is current (using 45-day cutoff)
+        last_date_parsed = dt.datetime.strptime(last_date, "%Y-%m-%d").date()
+        is_current = last_date_parsed >= cutoff_date
         
-        # Parse price points
-        price_changes = []
-        if row.price_points:
-            try:
-                price_changes = sorted([float(p) for p in row.price_points.split(',')], key=float)
-            except (ValueError, AttributeError):
-                price_changes = []
+        # Calculate stable monthly amount (ignores one-off spikes)
+        monthly_amount = calculate_stable_price(monthly_data)
         
-        # Use the most recent price as monthly amount
-        monthly_amount = price_changes[-1] if price_changes else (row.total_charged / row.months_count if row.months_count > 0 else 0)
+        # Calculate chronological price evolution
+        price_evolution = calculate_price_evolution(monthly_data)
         
         subscriptions.append({
-            "merchant": canonical_merchant,  # Use canonical name for consistency
-            "monthly_amount": round(monthly_amount, 2),
-            "months_count": int(row.months_count),
-            "total_charged": round(float(row.total_charged), 2),
-            "first_date": row.first_date,
-            "last_date": row.last_date,
+            "merchant": canonical_merchant,
+            "monthly_amount": monthly_amount,
+            "months_count": months_count,
+            "total_charged": round(total_charged, 2),
+            "first_date": first_date,
+            "last_date": last_date,
             "category": category_name,
-            "price_changes": price_changes if len(price_changes) > 1 else None,
+            "price_changes": price_evolution,
             "is_current": is_current
         })
     

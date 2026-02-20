@@ -735,6 +735,31 @@ def get_imports(db: Session = Depends(get_database)):
     
     return result
 
+@router.post("/staging/fix-ready-status")
+def fix_ready_status(db: Session = Depends(get_database)):
+    """Fix staging transactions that are marked as 'ready' but have no category assigned.
+    
+    This is a one-time fix for a bug where pending->posted transactions were incorrectly
+    marked as 'ready' even without a category.
+    """
+    # Find all staging transactions with status='ready' but no category
+    invalid_ready = db.query(StagingTransaction).filter(
+        StagingTransaction.status == "ready",
+        StagingTransaction.suggested_category_id.is_(None)
+    ).all()
+    
+    count = 0
+    for tx in invalid_ready:
+        tx.status = "needs_category"
+        count += 1
+    
+    db.commit()
+    
+    return {
+        "fixed": count,
+        "message": f"Fixed {count} transactions that were incorrectly marked as ready"
+    }
+
 @router.post("/imports/{import_id}/remap-staging")
 def remap_staging_transactions(
     import_id: int,
@@ -775,6 +800,9 @@ class UpdateCategoryRequest(BaseModel):
     category_id: int
     subcategory_id: Optional[int] = None
 
+class UpdateAmountRequest(BaseModel):
+    amount: float
+
 @router.put("/staging/{staging_id}/category")
 def update_staging_category(
     staging_id: int,
@@ -782,7 +810,11 @@ def update_staging_category(
     request: Optional[UpdateCategoryRequest] = Body(default=None),
     db: Session = Depends(get_database)
 ):
-    """Update category for a staging transaction."""
+    """Update category for a staging transaction.
+    
+    Also propagates the category to other staging transactions with the exact same
+    merchant_name and name combination (for consistency across the same merchant).
+    """
     # Allow both query parameter and request body
     if category_id is None and request and hasattr(request, 'category_id'):
         category_id = request.category_id
@@ -793,12 +825,32 @@ def update_staging_category(
     if not tx:
         raise HTTPException(status_code=404, detail="Staging transaction not found")
     
-    tx.suggested_category_id = category_id
-    tx.suggested_subcategory_id = request.subcategory_id if request else None
+    subcategory_id = request.subcategory_id if request else None
     
-    # Update status
+    # Update the original transaction
+    tx.suggested_category_id = category_id
+    tx.suggested_subcategory_id = subcategory_id
     if tx.status == "needs_category":
         tx.status = "ready"
+    
+    # Propagate to other staging transactions with the same merchant_name AND name
+    # This ensures transactions for the same merchant on different days also get categorized
+    propagated_count = 0
+    if tx.merchant_name and tx.name:
+        # Find other transactions with exact same merchant_name and name
+        matching_txs = db.query(StagingTransaction).filter(
+            StagingTransaction.id != staging_id,
+            StagingTransaction.merchant_name == tx.merchant_name,
+            StagingTransaction.name == tx.name,
+            StagingTransaction.status.in_(["needs_category", "ready"])  # Only update uncommitted ones
+        ).all()
+        
+        for matching_tx in matching_txs:
+            matching_tx.suggested_category_id = category_id
+            matching_tx.suggested_subcategory_id = subcategory_id
+            if matching_tx.status == "needs_category":
+                matching_tx.status = "ready"
+            propagated_count += 1
     
     db.commit()
     
@@ -806,7 +858,29 @@ def update_staging_category(
         "id": tx.id,
         "status": tx.status,
         "suggested_category_id": tx.suggested_category_id,
-        "suggested_subcategory_id": tx.suggested_subcategory_id
+        "suggested_subcategory_id": tx.suggested_subcategory_id,
+        "propagated_count": propagated_count
+    }
+
+@router.put("/staging/{staging_id}/amount")
+def update_staging_amount(
+    staging_id: int,
+    request: UpdateAmountRequest,
+    db: Session = Depends(get_database)
+):
+    """Update amount for a staging transaction (for split payments, adjustments, etc.)."""
+    tx = db.query(StagingTransaction).filter(StagingTransaction.id == staging_id).first()
+    if not tx:
+        raise HTTPException(status_code=404, detail="Staging transaction not found")
+    
+    from decimal import Decimal
+    tx.amount = Decimal(str(request.amount))
+    db.commit()
+    
+    return {
+        "id": tx.id,
+        "amount": float(tx.amount),
+        "message": "Amount updated successfully"
     }
 
 @router.post("/staging/bulk-categorize")
@@ -848,6 +922,31 @@ def delete_staging_transaction(
     db.commit()
     
     return {"message": "Transaction deleted successfully"}
+
+class BulkDeleteRequest(BaseModel):
+    staging_ids: List[int]
+
+@router.post("/staging/bulk-delete")
+def bulk_delete_staging(
+    request: BulkDeleteRequest,
+    db: Session = Depends(get_database)
+):
+    """Bulk delete staging transactions."""
+    transactions = db.query(StagingTransaction).filter(
+        StagingTransaction.id.in_(request.staging_ids)
+    ).all()
+    
+    deleted_count = 0
+    for tx in transactions:
+        db.delete(tx)
+        deleted_count += 1
+    
+    db.commit()
+    
+    return {
+        "deleted": deleted_count,
+        "message": f"Deleted {deleted_count} transactions"
+    }
 
 class CreateCategoryRequest(BaseModel):
     name: str

@@ -1,9 +1,9 @@
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useSearchParams, useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
   Check, X, AlertCircle, ArrowUpRight, Filter, 
-  CheckCircle2, XCircle, Clock, Copy, Eye, Trash2, Plus 
+  CheckCircle2, XCircle, Clock, Copy, Eye, Trash2, Plus, Pencil, ArrowUpDown 
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -70,6 +70,10 @@ export default function StagingTab() {
   const [jsonModalOpen, setJsonModalOpen] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState<Record<number, string>>({});
   const [showNewCategoryInput, setShowNewCategoryInput] = useState<Record<number, boolean>>({});
+  const [editingAmount, setEditingAmount] = useState<Record<number, boolean>>({});
+  const [editedAmountValue, setEditedAmountValue] = useState<Record<number, string>>({});
+  const [sortColumn, setSortColumn] = useState<'date' | 'amount' | null>(null);
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   
   // Ref for scroll container
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -242,7 +246,7 @@ export default function StagingTab() {
     }
   });
 
-  // Delete mutation
+  // Delete mutation (single)
   const deleteMutation = useMutation({
     mutationFn: async (stagingId: number) => {
       const response = await fetch(`/api/plaid/staging/${stagingId}`, {
@@ -253,6 +257,64 @@ export default function StagingTab() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['staging'] });
       toast({ title: 'Transaction deleted' });
+    }
+  });
+
+  // Bulk delete mutation
+  const bulkDeleteMutation = useMutation({
+    mutationFn: async (stagingIds: number[]) => {
+      const response = await fetch('/api/plaid/staging/bulk-delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ staging_ids: stagingIds })
+      });
+      if (!response.ok) {
+        throw new Error(`Failed to delete: ${response.statusText}`);
+      }
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['staging'] });
+      setSelectedRows(new Set());
+      toast({ 
+        title: 'Transactions deleted',
+        description: `Deleted ${data.deleted} transactions`
+      });
+    },
+    onError: (error) => {
+      console.error('Failed to bulk delete:', error);
+      toast({ 
+        title: 'Error',
+        description: 'Failed to delete transactions. Please try again.',
+        variant: 'destructive'
+      });
+    }
+  });
+
+  // Update amount mutation
+  const updateAmountMutation = useMutation({
+    mutationFn: async ({ stagingId, amount }: { stagingId: number; amount: number }) => {
+      const response = await fetch(`/api/plaid/staging/${stagingId}/amount`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount })
+      });
+      if (!response.ok) {
+        throw new Error(`Failed to update amount: ${response.statusText}`);
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['staging'] });
+      toast({ title: 'Amount updated' });
+    },
+    onError: (error) => {
+      console.error('Failed to update amount:', error);
+      toast({ 
+        title: 'Error',
+        description: 'Failed to update amount. Please try again.',
+        variant: 'destructive'
+      });
     }
   });
 
@@ -297,11 +359,14 @@ export default function StagingTab() {
       }
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['staging'] });
+      const propagatedCount = data.propagated_count || 0;
       toast({ 
         title: 'Category saved',
-        description: 'Transaction category updated'
+        description: propagatedCount > 0 
+          ? `Updated ${propagatedCount + 1} transactions with same merchant`
+          : 'Transaction category updated'
       });
     },
     onError: (error) => {
@@ -332,6 +397,45 @@ export default function StagingTab() {
     setSelectedRows(newSelected);
   };
 
+
+  const handleSaveAmount = async (txId: number) => {
+    const amountStr = editedAmountValue[txId];
+    if (!amountStr) return;
+    
+    const amount = parseFloat(amountStr);
+    if (isNaN(amount)) {
+      toast({ title: 'Invalid amount', variant: 'destructive' });
+      return;
+    }
+    
+    await updateAmountMutation.mutateAsync({ stagingId: txId, amount });
+    setEditingAmount(prev => ({ ...prev, [txId]: false }));
+    setEditedAmountValue(prev => ({ ...prev, [txId]: '' }));
+  };
+
+  const handleSort = (column: 'date' | 'amount') => {
+    if (sortColumn === column) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortColumn(column);
+      setSortDirection('desc');
+    }
+  };
+
+  // Apply sorting to transactions
+  const sortedTransactions = useMemo(() => {
+    if (!stagingData?.transactions || !sortColumn) return stagingData?.transactions || [];
+    
+    return [...stagingData.transactions].sort((a, b) => {
+      let comparison = 0;
+      if (sortColumn === 'date') {
+        comparison = (a.date || '').localeCompare(b.date || '');
+      } else if (sortColumn === 'amount') {
+        comparison = Math.abs(a.amount) - Math.abs(b.amount);
+      }
+      return sortDirection === 'asc' ? comparison : -comparison;
+    });
+  }, [stagingData?.transactions, sortColumn, sortDirection]);
 
   const handleCreateNewCategory = async (txId: number) => {
     const name = newCategoryName[txId]?.trim();
@@ -413,10 +517,24 @@ export default function StagingTab() {
         
         <div className="flex gap-2">
           {selectedRows.size > 0 && (
-            <Button variant="outline" onClick={() => approveMutation.mutate(Array.from(selectedRows))}>
-              <Check className="mr-2 h-4 w-4" />
-              Approve Selected ({selectedRows.size})
-            </Button>
+            <>
+              <Button 
+                variant="outline" 
+                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                onClick={() => {
+                  if (confirm(`Are you sure you want to delete ${selectedRows.size} transaction(s)?`)) {
+                    bulkDeleteMutation.mutate(Array.from(selectedRows));
+                  }
+                }}
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete Selected ({selectedRows.size})
+              </Button>
+              <Button variant="outline" onClick={() => approveMutation.mutate(Array.from(selectedRows))}>
+                <Check className="mr-2 h-4 w-4" />
+                Approve Selected ({selectedRows.size})
+              </Button>
+            </>
           )}
           <Button 
             onClick={() => {
@@ -499,10 +617,30 @@ export default function StagingTab() {
                   onCheckedChange={handleSelectAll}
                 />
               </TableHead>
-              <TableHead>Date</TableHead>
+              <TableHead>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-8 px-2 -ml-2"
+                  onClick={() => handleSort('date')}
+                >
+                  Date
+                  <ArrowUpDown className={`ml-1 h-3 w-3 ${sortColumn === 'date' ? 'text-primary' : 'text-muted-foreground'}`} />
+                </Button>
+              </TableHead>
               <TableHead>Description</TableHead>
               <TableHead>Merchant</TableHead>
-              <TableHead>Amount</TableHead>
+              <TableHead>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-8 px-2 -ml-2"
+                  onClick={() => handleSort('amount')}
+                >
+                  Amount
+                  <ArrowUpDown className={`ml-1 h-3 w-3 ${sortColumn === 'amount' ? 'text-primary' : 'text-muted-foreground'}`} />
+                </Button>
+              </TableHead>
               <TableHead>Account</TableHead>
               <TableHead>Category</TableHead>
               <TableHead>Status</TableHead>
@@ -516,14 +654,14 @@ export default function StagingTab() {
                   Loading transactions...
                 </TableCell>
               </TableRow>
-            ) : stagingData?.transactions.length === 0 ? (
+            ) : sortedTransactions.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                   No transactions found
                 </TableCell>
               </TableRow>
             ) : (
-              stagingData?.transactions.map((tx) => (
+              sortedTransactions.map((tx) => (
                 <TableRow key={tx.id} className={tx.status === 'excluded' ? 'opacity-50' : ''}>
                   <TableCell>
                     <Checkbox
@@ -549,10 +687,58 @@ export default function StagingTab() {
                     {tx.merchant_name || '-'}
                   </TableCell>
                   <TableCell className="font-medium">
-                    <span className={tx.amount < 0 ? "text-green-600" : ""}>
-                      {formatCurrency(Math.abs(tx.amount))}
-                      {tx.amount < 0 && " (refund)"}
-                    </span>
+                    {editingAmount[tx.id] ? (
+                      <div className="flex gap-1 items-center">
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={editedAmountValue[tx.id] || ''}
+                          onChange={(e) => setEditedAmountValue(prev => ({ ...prev, [tx.id]: e.target.value }))}
+                          className="w-24 h-7 text-sm"
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleSaveAmount(tx.id);
+                            if (e.key === 'Escape') {
+                              setEditingAmount(prev => ({ ...prev, [tx.id]: false }));
+                              setEditedAmountValue(prev => ({ ...prev, [tx.id]: '' }));
+                            }
+                          }}
+                          autoFocus
+                        />
+                        <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => handleSaveAmount(tx.id)}>
+                          <Check className="h-3 w-3" />
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="ghost" 
+                          className="h-6 w-6 p-0" 
+                          onClick={() => {
+                            setEditingAmount(prev => ({ ...prev, [tx.id]: false }));
+                            setEditedAmountValue(prev => ({ ...prev, [tx.id]: '' }));
+                          }}
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1 group">
+                        <span className={tx.amount < 0 ? "text-green-600" : ""}>
+                          {formatCurrency(Math.abs(tx.amount))}
+                          {tx.amount < 0 && " (refund)"}
+                        </span>
+                        <Button 
+                          size="sm" 
+                          variant="ghost" 
+                          className="h-5 w-5 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={() => {
+                            setEditingAmount(prev => ({ ...prev, [tx.id]: true }));
+                            setEditedAmountValue(prev => ({ ...prev, [tx.id]: Math.abs(tx.amount).toString() }));
+                          }}
+                          title="Edit amount"
+                        >
+                          <Pencil className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    )}
                   </TableCell>
                   <TableCell>{tx.account_name}</TableCell>
                   <TableCell>

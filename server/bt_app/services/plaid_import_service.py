@@ -803,7 +803,11 @@ class PlaidImportService:
             staging_tx.status = "ready"
             print(f"[MAPPING DEBUG] SUCCESS: Mapped to category_id={category_id}")
         else:
-            print(f"[MAPPING DEBUG] NO MATCH: No mapping found")
+            # No category found - ensure status is needs_category (not ready)
+            # This fixes the bug where pending->posted transactions were marked ready without a category
+            if staging_tx.status != "excluded" and staging_tx.status != "duplicate":
+                staging_tx.status = "needs_category"
+            print(f"[MAPPING DEBUG] NO MATCH: No mapping found, status set to needs_category")
     
     def _reconcile_pending_posted(self, import_id: int) -> None:
         """Reconcile pending->posted transactions."""
@@ -851,6 +855,11 @@ class PlaidImportService:
             "superseded_replacements": 0
         }
         
+        # Track hashes we've added in THIS batch to avoid duplicates within same commit
+        batch_hashes = set()
+        
+        print(f"[COMMIT] Processing {len(staged_txs)} staging transactions...")
+        
         for staged in staged_txs:
             # SANITIZE STRINGS SAFELY (only change from original)
             merchant_name_safe = _safe_text(staged.merchant_name or "")
@@ -866,7 +875,7 @@ class PlaidImportService:
                 name_safe
             )
             
-            # Check for duplicate by external_id (Plaid transaction ID) first
+            # Check for duplicate by external_id OR plaid_transaction_id (Plaid transaction ID) first
             external_id = _safe_text(staged.plaid_transaction_id)
             existing_by_id = self.db.query(Transaction).filter(
                 Transaction.external_id == external_id
@@ -875,11 +884,81 @@ class PlaidImportService:
             if existing_by_id:
                 summary["skipped_duplicates"] += 1
                 continue
+            
+            # Also check by plaid_transaction_id for older records that may not have external_id set
+            existing_by_plaid_id = self.db.query(Transaction).filter(
+                Transaction.plaid_transaction_id == external_id
+            ).first()
+            
+            if existing_by_plaid_id:
+                summary["skipped_duplicates"] += 1
+                continue
+            
+            # Calculate amount_db BEFORE duplicate checks (need correct sign for comparison)
+            # Use Plaid's consistent sign convention:
+            # amount > 0 → outflow (money leaves account) → expense
+            # amount < 0 → inflow (money enters account) → income
+            plaid_amount = float(staged.amount or 0)
+            
+            # Use Plaid's personal_finance_category to determine income vs expense
+            # This is more reliable than sign detection which varies by institution
+            pf_category = (staged.pf_category_primary or "").upper()
+            
+            # Income categories from Plaid
+            income_categories = ["INCOME", "TRANSFER_IN"]
+            is_income = any(cat in pf_category for cat in income_categories)
+            
+            if is_income:
+                # This is income (interest, deposits, refunds, etc.)
+                txn_type = "income"
+                amount_db = abs(plaid_amount)  # Store income as positive
+                print(f"[COMMIT] Detected INCOME by category '{pf_category}': {staged.merchant_name or staged.name}")
+            else:
+                # This is an expense (purchases, payments, etc.)
+                txn_type = "expense"
+                amount_db = -abs(plaid_amount)  # Store expenses as negative
+                print(f"[COMMIT] Detected EXPENSE by category '{pf_category}': {staged.merchant_name or staged.name}")
+            
+            # Check for duplicate by the ACTUAL composite unique constraint: 
+            # (account_id, posted_date, amount, hash_dedupe)
+            hash_dedupe = _safe_text(staged.hash_key)
+            
+            # First check: skip if we already added this hash in the CURRENT batch
+            if hash_dedupe in batch_hashes:
+                print(f"[COMMIT] Skipping duplicate in same batch: {hash_dedupe[:20]}...")
+                summary["skipped_duplicates"] += 1
+                continue
+            
+            # Debug: Log what we're checking
+            print(f"[COMMIT DEBUG] Checking for duplicate: account_id={staged.account_id}, date={staged.date}, amount_db={amount_db}, hash={hash_dedupe[:20]}...")
+            
+            # Use cast to handle Decimal vs float comparison issues
+            from sqlalchemy import cast, Numeric
+            existing_by_composite = self.db.query(Transaction).filter(
+                Transaction.account_id == staged.account_id,
+                Transaction.posted_date == staged.date,
+                Transaction.hash_dedupe == hash_dedupe
+            ).first()
+            
+            if existing_by_composite:
+                print(f"[COMMIT DEBUG] Found duplicate by hash! Skipping. DB amount={existing_by_composite.amount}")
+                summary["skipped_duplicates"] += 1
+                continue
+            
+            # Also check just by hash_dedupe alone (it should be unique enough)
+            existing_by_hash = self.db.query(Transaction).filter(
+                Transaction.hash_dedupe == hash_dedupe
+            ).first()
+            
+            if existing_by_hash:
+                print(f"[COMMIT DEBUG] Found duplicate by hash alone! Skipping.")
+                summary["skipped_duplicates"] += 1
+                continue
                 
             # Also check for content-based duplicate: same date, amount, description, and category
             existing_by_content = self.db.query(Transaction).filter(
                 Transaction.posted_date == staged.date,
-                Transaction.amount == abs(staged.amount),
+                Transaction.amount == amount_db,  # Use correct signed amount
                 Transaction.description_norm == description_norm,
                 Transaction.category_id == staged.suggested_category_id
             ).first()
@@ -887,27 +966,6 @@ class PlaidImportService:
             if existing_by_content:
                 summary["skipped_duplicates"] += 1
                 continue
-            
-            # Use Plaid's consistent sign convention:
-            # amount > 0 → outflow (money leaves account) → expense
-            # amount < 0 → inflow (money enters account) → income
-            from decimal import Decimal
-            
-            plaid_amount = float(staged.amount or 0)
-            
-            # Debug logging to verify sign logic
-            print(f"[COMMIT DEBUG] Staging amount: {staged.amount}, plaid_amount: {plaid_amount}")
-            
-            if plaid_amount > 0:
-                # Outflow -> expense
-                txn_type = "expense"
-                amount_db = -abs(plaid_amount)  # store expenses as negatives in the ledger
-                print(f"[COMMIT DEBUG] Positive amount -> txn_type: {txn_type}, amount_db: {amount_db}")
-            else:
-                # Inflow -> income
-                txn_type = "income"
-                amount_db = abs(plaid_amount)   # store income as positives
-                print(f"[COMMIT DEBUG] Negative amount -> txn_type: {txn_type}, amount_db: {amount_db}")
             
             # Determine source based on account
             account = self.db.query(Account).filter(Account.id == staged.account_id).first()
@@ -943,11 +1001,13 @@ class PlaidImportService:
                 txn_type=_safe_text(txn_type),  # Use normalized type
                 import_id=import_id,
                 raw_json=_safe_json_text(staged.raw_json),
-                hash_dedupe=_safe_text(staged.hash_key)
+                hash_dedupe=hash_dedupe  # Use the already-calculated value
             )
             
             self.db.add(transaction)
+            batch_hashes.add(hash_dedupe)  # Track this hash to avoid duplicates in same batch
             summary["inserted"] += 1
+            print(f"[COMMIT] Added transaction: {staged.merchant_name or staged.name}, amount={amount_db}")
         
         self.db.commit()
         return summary

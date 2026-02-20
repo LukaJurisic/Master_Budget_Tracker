@@ -4,7 +4,7 @@
 Write-Host "💼 Starting Budget Tracker in PRODUCTION MODE..." -ForegroundColor Green
 Write-Host ("=" * 60)
 
-cd $PSScriptRoot
+cd $PSScriptRoot\..\..\
 
 # Remove any stale app.db that appears in wrong location
 Remove-Item .\app\app.db -Force -ErrorAction SilentlyContinue
