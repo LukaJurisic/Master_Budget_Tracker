@@ -133,6 +133,35 @@
     - Verified working state in emulator:
       - Dashboard fully renders with cards/charts.
       - Fallback banner for latest available month appears correctly.
+  - Mobile-first analytics overhaul:
+    - Added responsive breakpoint hook: `web/src/hooks/useIsMobile.ts`.
+    - Refactored analytics page layout for phone:
+      - `web/src/pages/AnalyticsDashboard.tsx`
+      - compact header, full-width refresh CTA, tighter section spacing.
+    - Refactored analytics controls and chart components for mobile readability:
+      - `web/src/components/dashboard/DateRangePicker.tsx`
+      - `web/src/components/dashboard/TotalsTriplet.tsx`
+      - `web/src/components/dashboard/IncomeVsExpensesWithAverage.tsx`
+      - `web/src/components/dashboard/SavingsByMonth.tsx`
+      - `web/src/components/dashboard/CategoryFocus.tsx`
+      - `web/src/components/dashboard/CategoryMerchantStackedBar.tsx`
+      - `web/src/components/dashboard/TransactionFrequencyByCategory.tsx`
+      - `web/src/components/dashboard/TransactionFrequencyByMerchant.tsx`
+      - `web/src/components/dashboard/SpendingAmountByCategory.tsx`
+      - `web/src/components/dashboard/SpendingAmountByMerchant.tsx`
+      - `web/src/components/dashboard/RecurringSubscriptions.tsx`
+    - Updated dashboard charts to use mobile-aware chart margins and axis settings:
+      - `web/src/components/dashboard/NetWorthArea.tsx`
+      - `web/src/components/dashboard/IncomeVsExpensesLines.tsx`
+      - `web/src/components/dashboard/TopCategoriesBar.tsx`
+    - Validation captures from emulator:
+      - `artifacts/mobile-bugs/20260220-122727-nav-test-390/screenshot.png`
+      - `artifacts/mobile-bugs/20260220-122746-analytics-charts-1/screenshot.png`
+      - `artifacts/mobile-bugs/20260220-122752-analytics-charts-2/screenshot.png`
+      - `artifacts/mobile-bugs/20260220-122758-analytics-charts-3/screenshot.png`
+      - `artifacts/mobile-bugs/20260220-122818-analytics-charts-4/screenshot.png`
+      - `artifacts/mobile-bugs/20260220-122823-analytics-charts-5/screenshot.png`
+      - `artifacts/mobile-bugs/20260220-122848-analytics-recurring-mobile/screenshot.png`
 
 ## Next Milestone
 - Android emulator loop (Windows):

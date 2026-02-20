@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { apiClient } from '@/lib/api'
+import { useIsMobile } from '@/hooks/useIsMobile'
 
 interface DateRangePickerProps {
   onRangeChange: (startDate: string, endDate: string) => void
@@ -14,6 +15,7 @@ interface DateRangePickerProps {
 export function DateRangePicker({ onRangeChange, disabled }: DateRangePickerProps) {
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
+  const isMobile = useIsMobile()
 
   // Get available date range from backend
   const { data: availableMonths } = useQuery({
@@ -102,15 +104,15 @@ export function DateRangePicker({ onRangeChange, disabled }: DateRangePickerProp
 
   return (
     <Card className="border-blue-200 bg-blue-50">
-      <CardContent className="pt-6">
-        <div className="space-y-4">
+      <CardContent className="pt-4 sm:pt-6">
+        <div className="space-y-3 sm:space-y-4">
           <div className="flex items-center space-x-2">
             <Calendar className="h-4 w-4 text-blue-600" />
             <Label className="text-sm font-medium text-blue-800">Date Range Filter</Label>
           </div>
           
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center space-x-2">
+          <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap sm:items-center sm:gap-3">
+            <div className="grid grid-cols-[40px_1fr] items-center gap-2">
               <Label htmlFor="start-date" className="text-xs text-gray-600">From:</Label>
               <input
                 id="start-date"
@@ -120,11 +122,11 @@ export function DateRangePicker({ onRangeChange, disabled }: DateRangePickerProp
                 min={minAllowed}
                 max={maxAllowed}
                 disabled={disabled}
-                className="px-2 py-1 text-xs border rounded focus:ring-1 focus:ring-blue-300 disabled:bg-gray-100"
+                className="w-full rounded border px-2 py-1 text-xs focus:ring-1 focus:ring-blue-300 disabled:bg-gray-100"
               />
             </div>
             
-            <div className="flex items-center space-x-2">
+            <div className="grid grid-cols-[40px_1fr] items-center gap-2">
               <Label htmlFor="end-date" className="text-xs text-gray-600">To:</Label>
               <input
                 id="end-date"
@@ -134,17 +136,17 @@ export function DateRangePicker({ onRangeChange, disabled }: DateRangePickerProp
                 min={minAllowed}
                 max={maxAllowed}
                 disabled={disabled}
-                className="px-2 py-1 text-xs border rounded focus:ring-1 focus:ring-blue-300 disabled:bg-gray-100"
+                className="w-full rounded border px-2 py-1 text-xs focus:ring-1 focus:ring-blue-300 disabled:bg-gray-100"
               />
             </div>
             
-            <div className="flex space-x-1">
+            <div className="grid grid-cols-3 gap-1 sm:flex sm:space-x-1">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => handleQuickRange('ytd')}
                 disabled={disabled}
-                className="px-2 py-1 text-xs h-7"
+                className="h-8 px-2 py-1 text-xs"
               >
                 YTD
               </Button>
@@ -153,7 +155,7 @@ export function DateRangePicker({ onRangeChange, disabled }: DateRangePickerProp
                 size="sm"
                 onClick={() => handleQuickRange('last12')}
                 disabled={disabled}
-                className="px-2 py-1 text-xs h-7"
+                className="h-8 px-2 py-1 text-xs"
               >
                 Last 12M
               </Button>
@@ -162,7 +164,7 @@ export function DateRangePicker({ onRangeChange, disabled }: DateRangePickerProp
                 size="sm"
                 onClick={() => handleQuickRange('all')}
                 disabled={disabled}
-                className="px-2 py-1 text-xs h-7"
+                className="h-8 px-2 py-1 text-xs"
               >
                 All Time
               </Button>
@@ -172,6 +174,7 @@ export function DateRangePicker({ onRangeChange, disabled }: DateRangePickerProp
           {availableMonths.min_month && availableMonths.latest_with_data && (
             <p className="text-xs text-gray-500">
               Available data: {availableMonths.min_month} to {availableMonths.latest_with_data}
+              {isMobile ? ' (optimized for phone range picks)' : ''}
             </p>
           )}
         </div>

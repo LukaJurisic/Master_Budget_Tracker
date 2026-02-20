@@ -6,6 +6,7 @@ import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxi
 import { formatCurrency } from '@/lib/formatters'
 import { apiClient } from '@/lib/api'
 import { EmptyState } from './EmptyState'
+import { useIsMobile } from '@/hooks/useIsMobile'
 
 interface CategoryMerchantStackedBarProps {
   dateFrom: string
@@ -24,6 +25,7 @@ const MERCHANT_COLORS = [
 export function CategoryMerchantStackedBar({ dateFrom, dateTo, disabled }: CategoryMerchantStackedBarProps) {
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null)
   const [hasInitialized, setHasInitialized] = useState(false)
+  const isMobile = useIsMobile()
 
   // Get available categories
   const { data: categories } = useQuery({
@@ -133,9 +135,9 @@ export function CategoryMerchantStackedBar({ dateFrom, dateTo, disabled }: Categ
       <CardContent>
         <div className="space-y-4">
           {/* Category selector */}
-          <div className="flex items-center space-x-2">
+          <div className="grid grid-cols-1 gap-2 sm:flex sm:items-center sm:space-x-2">
             <label className="text-sm font-medium">Category:</label>
-            <div className="w-64">
+            <div className="w-full sm:w-64">
               <Select 
                 value={selectedCategoryId ? selectedCategoryId.toString() : ""} 
                 onValueChange={handleCategoryChange}
@@ -157,7 +159,7 @@ export function CategoryMerchantStackedBar({ dateFrom, dateTo, disabled }: Categ
           </div>
 
           {/* Chart area */}
-          <div className="h-80">
+          <div className="h-72 sm:h-80">
             {!selectedCategoryId ? (
               <EmptyState 
                 title="Select a category"
@@ -174,16 +176,21 @@ export function CategoryMerchantStackedBar({ dateFrom, dateTo, disabled }: Categ
               />
             ) : (
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData} margin={{ top: 20, right: 30, left: 80, bottom: 70 }}>
+                <BarChart
+                  data={chartData}
+                  margin={isMobile ? { top: 12, right: 8, left: 0, bottom: 20 } : { top: 20, right: 24, left: 64, bottom: 52 }}
+                >
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis 
                     dataKey="month" 
-                    angle={-45}
-                    textAnchor="end"
-                    height={60}
-                    fontSize={12}
+                    angle={isMobile ? 0 : -35}
+                    textAnchor={isMobile ? "middle" : "end"}
+                    interval={isMobile ? "preserveStartEnd" : 0}
+                    minTickGap={isMobile ? 16 : 8}
+                    height={isMobile ? 30 : 60}
+                    fontSize={isMobile ? 10 : 12}
                   />
-                  <YAxis tickFormatter={formatCurrency} width={70} />
+                  <YAxis tickFormatter={formatCurrency} width={isMobile ? 44 : 70} tick={{ fontSize: isMobile ? 10 : 12 }} />
                   <Tooltip 
                     content={({ active, payload, label }) => {
                       if (active && payload && payload.length > 0) {
@@ -195,7 +202,7 @@ export function CategoryMerchantStackedBar({ dateFrom, dateTo, disabled }: Categ
                         if (sortedPayload.length === 0) return null
                         
                         return (
-                          <div className="bg-background border border-border rounded-lg p-3 shadow-lg">
+                          <div className="max-w-[260px] rounded-lg border border-border bg-background p-3 shadow-lg sm:max-w-none">
                             <p className="font-medium mb-2">{`Month: ${label}`}</p>
                             {sortedPayload.map((entry, index) => (
                               <div key={index} className="flex justify-between items-center gap-4 text-sm">
@@ -233,7 +240,7 @@ export function CategoryMerchantStackedBar({ dateFrom, dateTo, disabled }: Categ
 
           {/* Summary stats */}
           {merchantData && chartData.length > 0 && (
-            <div className="flex justify-between text-sm text-gray-600 pt-2 border-t">
+            <div className="grid grid-cols-2 gap-2 border-t pt-2 text-xs text-gray-600 sm:flex sm:justify-between sm:text-sm">
               <span>Merchants: {allMerchants.length}</span>
               <span>Months: {chartData.length}</span>
               <span>Total: {formatCurrency(merchantData.total || 0)}</span>

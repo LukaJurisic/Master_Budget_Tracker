@@ -1,7 +1,8 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { TransactionFrequencyByCategoryResponse } from '@/lib/api'
 import { EmptyState } from './EmptyState'
+import { useIsMobile } from '@/hooks/useIsMobile'
 
 interface TransactionFrequencyByCategoryProps {
   data: TransactionFrequencyByCategoryResponse | undefined
@@ -10,6 +11,8 @@ interface TransactionFrequencyByCategoryProps {
 }
 
 export function TransactionFrequencyByCategory({ data, isLoading, dateRange }: TransactionFrequencyByCategoryProps) {
+  const isMobile = useIsMobile()
+
   if (isLoading) {
     return (
       <Card>
@@ -18,7 +21,7 @@ export function TransactionFrequencyByCategory({ data, isLoading, dateRange }: T
           <CardDescription>Average transactions per month by category</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="h-[300px] flex items-center justify-center">
+          <div className="flex h-[240px] items-center justify-center sm:h-[300px]">
             <div className="text-muted-foreground">Loading...</div>
           </div>
         </CardContent>
@@ -34,10 +37,7 @@ export function TransactionFrequencyByCategory({ data, isLoading, dateRange }: T
           <CardDescription>Average transactions per month by category</CardDescription>
         </CardHeader>
         <CardContent>
-          <EmptyState 
-            title="No category data"
-            description="No categorized transactions found"
-          />
+          <EmptyState title="No category data" description="No categorized transactions found" />
         </CardContent>
       </Card>
     )
@@ -47,7 +47,6 @@ export function TransactionFrequencyByCategory({ data, isLoading, dateRange }: T
     category: item.category,
     avg_per_month: item.avg_per_month,
     total_transactions: item.total_transactions,
-    color: item.color || '#8884d8'
   }))
 
   return (
@@ -56,56 +55,46 @@ export function TransactionFrequencyByCategory({ data, isLoading, dateRange }: T
         <CardTitle>Transaction Frequency by Category</CardTitle>
         <CardDescription>
           Average transactions per month by category
-          {dateRange && ` • ${dateRange}`}
+          {dateRange && ` - ${dateRange}`}
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <ResponsiveContainer width="100%" height={300}>
-          <BarChart data={chartData} margin={{ top: 20, right: 30, left: 60, bottom: 80 }}>
+        <ResponsiveContainer width="100%" height={isMobile ? 240 : 300}>
+          <BarChart
+            data={chartData}
+            margin={isMobile ? { top: 12, right: 8, left: 0, bottom: 20 } : { top: 20, right: 24, left: 48, bottom: 64 }}
+          >
             <CartesianGrid strokeDasharray="3 3" />
-            <XAxis 
-              dataKey="category" 
-              angle={-45}
-              textAnchor="end"
-              height={80}
-              fontSize={12}
-              width={60}
+            <XAxis
+              dataKey="category"
+              angle={isMobile ? 0 : -35}
+              textAnchor={isMobile ? 'middle' : 'end'}
+              interval={isMobile ? 'preserveStartEnd' : 0}
+              minTickGap={isMobile ? 16 : 8}
+              height={isMobile ? 30 : 80}
+              fontSize={isMobile ? 10 : 12}
             />
-            <YAxis 
-              label={{ value: 'Avg/Month', angle: -90, position: 'insideLeft' }}
-              width={50}
+            <YAxis
+              label={isMobile ? undefined : { value: 'Avg/Month', angle: -90, position: 'insideLeft' }}
+              width={isMobile ? 36 : 50}
+              tick={{ fontSize: isMobile ? 10 : 12 }}
             />
-            <Tooltip 
-              formatter={(value: number, name: string) => {
-                if (name === 'avg_per_month') {
-                  return [`${value} avg/month`, 'Frequency']
-                }
-                return [value, name]
-              }}
-              labelFormatter={(label) => `Category: ${label}`}
+            <Tooltip
               content={({ active, payload, label }) => {
                 if (active && payload && payload.length > 0) {
-                  const data = payload[0].payload
+                  const row = payload[0].payload
                   return (
-                    <div className="bg-background border border-border rounded-lg p-3 shadow-lg">
+                    <div className="max-w-[260px] rounded-lg border border-border bg-background p-3 shadow-lg sm:max-w-none">
                       <p className="font-medium">{`Category: ${label}`}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {`${data.avg_per_month} transactions/month`}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {`${data.total_transactions} total transactions`}
-                      </p>
+                      <p className="text-sm text-muted-foreground">{`${row.avg_per_month} transactions/month`}</p>
+                      <p className="text-xs text-muted-foreground">{`${row.total_transactions} total transactions`}</p>
                     </div>
                   )
                 }
                 return null
               }}
             />
-            <Bar 
-              dataKey="avg_per_month" 
-              fill="#3b82f6"
-              radius={[2, 2, 0, 0]}
-            />
+            <Bar dataKey="avg_per_month" fill="#3b82f6" radius={[2, 2, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </CardContent>

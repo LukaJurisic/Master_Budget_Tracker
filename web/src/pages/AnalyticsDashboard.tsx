@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { RefreshCw, BarChart3 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { apiClient } from '@/lib/api'
+import { useIsMobile } from '@/hooks/useIsMobile'
 
 // Import new analytics components
 import { DateRangePicker } from '@/components/dashboard/DateRangePicker'
@@ -21,6 +22,7 @@ export default function AnalyticsDashboard() {
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const isMobile = useIsMobile()
 
   // Get summary data for the selected range
   const { data: summaryData, isLoading: summaryLoading, refetch: refetchSummary } = useQuery({
@@ -74,19 +76,19 @@ export default function AnalyticsDashboard() {
   const hasDateRange = !!dateFrom && !!dateTo
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold flex items-center space-x-2">
-            <BarChart3 className="h-8 w-8" />
+          <h1 className="flex items-center space-x-2 text-2xl font-bold sm:text-3xl">
+            <BarChart3 className="h-6 w-6 sm:h-8 sm:w-8" />
             <span>Analytics Dashboard</span>
           </h1>
-          <p className="text-muted-foreground">
+          <p className="text-sm text-muted-foreground sm:text-base">
             Excel-style financial analytics with date range filtering
           </p>
         </div>
-        <Button onClick={handleRefresh} disabled={isRefreshing}>
+        <Button onClick={handleRefresh} disabled={isRefreshing} className="w-full sm:w-auto">
           <RefreshCw className={`mr-2 h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
           Refresh Data
         </Button>
@@ -105,7 +107,7 @@ export default function AnalyticsDashboard() {
           <TotalsTriplet data={summaryData} isLoading={isLoading} />
 
           {/* Charts Row 1: Income vs Expenses and Savings */}
-          <div className="grid gap-6 md:grid-cols-2">
+          <div className="grid gap-4 md:grid-cols-2 md:gap-6">
             <IncomeVsExpensesWithAverage data={summaryData} isLoading={isLoading} />
             <SavingsByMonth data={summaryData} isLoading={isLoading} />
           </div>
@@ -118,7 +120,7 @@ export default function AnalyticsDashboard() {
           />
 
           {/* Transaction Frequency Row */}
-          <div className="grid gap-6 md:grid-cols-2">
+          <div className="grid gap-4 md:grid-cols-2 md:gap-6">
             <TransactionFrequencyByCategory 
               data={categoryFrequency}
               isLoading={categoryFrequencyLoading}
@@ -132,7 +134,7 @@ export default function AnalyticsDashboard() {
           </div>
 
           {/* Spending Amount Row */}
-          <div className="grid gap-6 md:grid-cols-2">
+          <div className="grid gap-4 md:grid-cols-2 md:gap-6">
             <SpendingAmountByCategory 
               data={categorySpending}
               isLoading={categorySpendingLoading}
@@ -162,9 +164,9 @@ export default function AnalyticsDashboard() {
 
       {/* Loading state when no date range */}
       {!hasDateRange && (
-        <div className="text-center py-12">
+        <div className="py-12 text-center">
           <p className="text-gray-500">
-            Select a date range to view analytics
+            {isMobile ? 'Pick a date range to load mobile analytics' : 'Select a date range to view analytics'}
           </p>
         </div>
       )}

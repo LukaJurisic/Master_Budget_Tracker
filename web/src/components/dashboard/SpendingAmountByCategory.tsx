@@ -1,8 +1,9 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { SpendingAmountByCategoryResponse } from '@/lib/api'
 import { formatCurrency } from '@/lib/formatters'
 import { EmptyState } from './EmptyState'
+import { useIsMobile } from '@/hooks/useIsMobile'
 
 interface SpendingAmountByCategoryProps {
   data: SpendingAmountByCategoryResponse | undefined
@@ -11,6 +12,8 @@ interface SpendingAmountByCategoryProps {
 }
 
 export function SpendingAmountByCategory({ data, isLoading, dateRange }: SpendingAmountByCategoryProps) {
+  const isMobile = useIsMobile()
+
   if (isLoading) {
     return (
       <Card>
@@ -19,7 +22,7 @@ export function SpendingAmountByCategory({ data, isLoading, dateRange }: Spendin
           <CardDescription>Total spending amount per month by category</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="h-[300px] flex items-center justify-center">
+          <div className="flex h-[240px] items-center justify-center sm:h-[300px]">
             <div className="text-muted-foreground">Loading...</div>
           </div>
         </CardContent>
@@ -35,10 +38,7 @@ export function SpendingAmountByCategory({ data, isLoading, dateRange }: Spendin
           <CardDescription>Total spending amount per month by category</CardDescription>
         </CardHeader>
         <CardContent>
-          <EmptyState 
-            title="No category data"
-            description="No categorized transactions found"
-          />
+          <EmptyState title="No category data" description="No categorized transactions found" />
         </CardContent>
       </Card>
     )
@@ -49,9 +49,7 @@ export function SpendingAmountByCategory({ data, isLoading, dateRange }: Spendin
     avg_per_month: item.avg_per_month,
     total_amount: item.total_amount,
     total_transactions: item.total_transactions,
-    color: item.color || '#10b981'
   }))
-
 
   return (
     <Card>
@@ -59,57 +57,47 @@ export function SpendingAmountByCategory({ data, isLoading, dateRange }: Spendin
         <CardTitle>Spending Amount by Category</CardTitle>
         <CardDescription>
           Average spending amount per month by category
-          {dateRange && ` • ${dateRange}`}
+          {dateRange && ` - ${dateRange}`}
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <ResponsiveContainer width="100%" height={300}>
-          <BarChart data={chartData} margin={{ top: 20, right: 30, left: 60, bottom: 80 }}>
+        <ResponsiveContainer width="100%" height={isMobile ? 240 : 300}>
+          <BarChart
+            data={chartData}
+            margin={isMobile ? { top: 12, right: 8, left: 0, bottom: 20 } : { top: 20, right: 24, left: 48, bottom: 64 }}
+          >
             <CartesianGrid strokeDasharray="3 3" />
-            <XAxis 
-              dataKey="category" 
-              angle={-45}
-              textAnchor="end"
-              height={80}
-              fontSize={12}
-              width={60}
+            <XAxis
+              dataKey="category"
+              angle={isMobile ? 0 : -35}
+              textAnchor={isMobile ? 'middle' : 'end'}
+              interval={isMobile ? 'preserveStartEnd' : 0}
+              minTickGap={isMobile ? 16 : 8}
+              height={isMobile ? 30 : 80}
+              fontSize={isMobile ? 10 : 12}
             />
-            <YAxis 
-              label={{ value: 'Amount ($)', angle: -90, position: 'insideLeft' }}
-              width={50}
+            <YAxis
+              label={isMobile ? undefined : { value: 'Amount ($)', angle: -90, position: 'insideLeft' }}
+              width={isMobile ? 36 : 50}
               tickFormatter={(value) => `$${value}`}
+              tick={{ fontSize: isMobile ? 10 : 12 }}
             />
-            <Tooltip 
-              formatter={(value: number, name: string) => {
-                if (name === 'avg_per_month') {
-                  return [`${formatCurrency(value)} avg/month`, 'Spending']
-                }
-                return [value, name]
-              }}
-              labelFormatter={(label) => `Category: ${label}`}
+            <Tooltip
               content={({ active, payload, label }) => {
                 if (active && payload && payload.length > 0) {
-                  const data = payload[0].payload
+                  const row = payload[0].payload
                   return (
-                    <div className="bg-background border border-border rounded-lg p-3 shadow-lg">
+                    <div className="max-w-[260px] rounded-lg border border-border bg-background p-3 shadow-lg sm:max-w-none">
                       <p className="font-medium">{`Category: ${label}`}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {`${formatCurrency(data.avg_per_month)} per month`}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {`${formatCurrency(data.total_amount)} total • ${data.total_transactions} transactions`}
-                      </p>
+                      <p className="text-sm text-muted-foreground">{`${formatCurrency(row.avg_per_month)} per month`}</p>
+                      <p className="text-xs text-muted-foreground">{`${formatCurrency(row.total_amount)} total · ${row.total_transactions} transactions`}</p>
                     </div>
                   )
                 }
                 return null
               }}
             />
-            <Bar 
-              dataKey="avg_per_month" 
-              fill="#10b981"
-              radius={[2, 2, 0, 0]}
-            />
+            <Bar dataKey="avg_per_month" fill="#10b981" radius={[2, 2, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </CardContent>

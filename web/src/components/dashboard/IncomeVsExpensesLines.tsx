@@ -3,12 +3,15 @@ import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YA
 import { formatCurrency, formatMonth } from '@/lib/formatters'
 import { DashboardLines } from '@/lib/api'
 import { EmptyState } from './EmptyState'
+import { useIsMobile } from '@/hooks/useIsMobile'
 
 interface IncomeVsExpensesLinesProps {
   data: DashboardLines
 }
 
 export function IncomeVsExpensesLines({ data }: IncomeVsExpensesLinesProps) {
+  const isMobile = useIsMobile()
+
   if (!data?.income_by_month?.length || !data?.expenses_by_month?.length) {
     return (
       <Card>
@@ -50,8 +53,6 @@ export function IncomeVsExpensesLines({ data }: IncomeVsExpensesLinesProps) {
       expense: item.expense,
     }))
 
-  console.log('Chart data first 5:', chartData.slice(0, 5))
-
   return (
     <Card>
       <CardHeader>
@@ -59,17 +60,19 @@ export function IncomeVsExpensesLines({ data }: IncomeVsExpensesLinesProps) {
         <CardDescription>Monthly cash flow comparison</CardDescription>
       </CardHeader>
       <CardContent>
-        <ResponsiveContainer width="100%" height={300}>
-          <LineChart data={chartData}>
+        <ResponsiveContainer width="100%" height={isMobile ? 240 : 300}>
+          <LineChart data={chartData} margin={isMobile ? { top: 12, right: 8, left: 0, bottom: 20 } : { top: 20, right: 24, left: 56, bottom: 52 }}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis 
               dataKey="month" 
-              angle={-45}
-              textAnchor="end"
-              height={60}
-              fontSize={12}
+              angle={isMobile ? 0 : -35}
+              textAnchor={isMobile ? "middle" : "end"}
+              interval={isMobile ? "preserveStartEnd" : 0}
+              minTickGap={isMobile ? 16 : 8}
+              height={isMobile ? 30 : 60}
+              fontSize={isMobile ? 10 : 12}
             />
-            <YAxis tickFormatter={formatCurrency} />
+            <YAxis tickFormatter={formatCurrency} width={isMobile ? 44 : 70} tick={{ fontSize: isMobile ? 10 : 12 }} />
             <Tooltip 
               formatter={(value: number, name: string) => [
                 formatCurrency(value), 
@@ -81,17 +84,17 @@ export function IncomeVsExpensesLines({ data }: IncomeVsExpensesLinesProps) {
               type="monotone"
               dataKey="income"
               stroke="#82ca9d"
-              strokeWidth={2}
+              strokeWidth={isMobile ? 2.5 : 2}
               name="income"
-              dot={{ r: 3 }}
+              dot={{ r: isMobile ? 2 : 3 }}
             />
             <Line
               type="monotone"
               dataKey="expense"
               stroke="#ff7c7c"
-              strokeWidth={2}
+              strokeWidth={isMobile ? 2.5 : 2}
               name="expense"
-              dot={{ r: 3 }}
+              dot={{ r: isMobile ? 2 : 3 }}
             />
           </LineChart>
         </ResponsiveContainer>

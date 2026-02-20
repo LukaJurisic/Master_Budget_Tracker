@@ -6,6 +6,7 @@ import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YA
 import { formatCurrency } from '@/lib/formatters'
 import { apiClient, CategorySeries } from '@/lib/api'
 import { EmptyState } from './EmptyState'
+import { useIsMobile } from '@/hooks/useIsMobile'
 
 interface CategoryFocusProps {
   dateFrom: string
@@ -16,6 +17,7 @@ interface CategoryFocusProps {
 export function CategoryFocus({ dateFrom, dateTo, disabled }: CategoryFocusProps) {
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null)
   const [hasInitialized, setHasInitialized] = useState(false)
+  const isMobile = useIsMobile()
 
   // Get available categories
   const { data: categories } = useQuery({
@@ -111,9 +113,9 @@ export function CategoryFocus({ dateFrom, dateTo, disabled }: CategoryFocusProps
       <CardContent>
         <div className="space-y-4">
           {/* Category selector */}
-          <div className="flex items-center space-x-2">
+          <div className="grid grid-cols-1 gap-2 sm:flex sm:items-center sm:space-x-2">
             <label className="text-sm font-medium">Category:</label>
-            <div className="w-64">
+            <div className="w-full sm:w-64">
               <Select 
                 value={selectedCategoryId === null ? "" : selectedCategoryId === -1 ? "all" : selectedCategoryId.toString()} 
                 onValueChange={handleCategoryChange}
@@ -135,7 +137,7 @@ export function CategoryFocus({ dateFrom, dateTo, disabled }: CategoryFocusProps
           </div>
 
           {/* Chart area */}
-          <div className="h-80">
+          <div className="h-72 sm:h-80">
             {!selectedCategoryId ? (
               <EmptyState 
                 title="Select a category"
@@ -152,17 +154,22 @@ export function CategoryFocus({ dateFrom, dateTo, disabled }: CategoryFocusProps
               />
             ) : (
               <ResponsiveContainer width="100%" height="100%">
-                <ComposedChart data={formatChartData(categoryData)} margin={{ top: 20, right: 50, left: 80, bottom: 70 }}>
+                <ComposedChart
+                  data={formatChartData(categoryData)}
+                  margin={isMobile ? { top: 12, right: 8, left: 0, bottom: 20 } : { top: 20, right: 36, left: 64, bottom: 52 }}
+                >
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis 
                     dataKey="month" 
-                    angle={-45}
-                    textAnchor="end"
-                    height={60}
-                    fontSize={12}
+                    angle={isMobile ? 0 : -35}
+                    textAnchor={isMobile ? "middle" : "end"}
+                    interval={isMobile ? "preserveStartEnd" : 0}
+                    minTickGap={isMobile ? 16 : 8}
+                    height={isMobile ? 30 : 60}
+                    fontSize={isMobile ? 10 : 12}
                   />
-                  <YAxis yAxisId="amount" tickFormatter={formatCurrency} width={70} />
-                  <YAxis yAxisId="count" orientation="right" width={50} />
+                  <YAxis yAxisId="amount" tickFormatter={formatCurrency} width={isMobile ? 44 : 70} tick={{ fontSize: isMobile ? 10 : 12 }} />
+                  <YAxis yAxisId="count" orientation="right" width={isMobile ? 28 : 50} tick={{ fontSize: isMobile ? 10 : 12 }} />
                   <Tooltip 
                     formatter={(value: number, name: string, props: any) => {
                       if (name === 'amount') return [formatCurrency(value), 'Amount'];
@@ -195,10 +202,7 @@ export function CategoryFocus({ dateFrom, dateTo, disabled }: CategoryFocusProps
                     stroke="#3b82f6" 
                     strokeDasharray="5 5"
                     strokeWidth={2}
-                    label={{ 
-                      value: `Avg: ${formatCurrency(categoryData.monthly_avg ?? 0)}`, 
-                      position: "topRight" 
-                    }}
+                    label={isMobile ? undefined : { value: `Avg: ${formatCurrency(categoryData.monthly_avg ?? 0)}`, position: "topRight" }}
                   />
                   
                   {/* Transaction count bars - darker for better visibility */}
@@ -217,10 +221,10 @@ export function CategoryFocus({ dateFrom, dateTo, disabled }: CategoryFocusProps
                     type="monotone"
                     dataKey="amount"
                     stroke="#3b82f6"
-                    strokeWidth={3}
+                    strokeWidth={isMobile ? 2.5 : 3}
                     name="amount"
-                    dot={{ r: 4, fill: "#3b82f6" }}
-                    activeDot={{ r: 6, fill: "#2563eb" }}
+                    dot={{ r: isMobile ? 2.5 : 4, fill: "#3b82f6" }}
+                    activeDot={{ r: isMobile ? 4 : 6, fill: "#2563eb" }}
                   />
                 </ComposedChart>
               </ResponsiveContainer>
@@ -232,7 +236,7 @@ export function CategoryFocus({ dateFrom, dateTo, disabled }: CategoryFocusProps
             const totalTxns = (categoryData.txn_counts ?? []).reduce((sum, count) => sum + count, 0);
             const avgPerTxn = totalTxns > 0 ? (categoryData.total ?? 0) / totalTxns : 0;
             return (
-              <div className="flex justify-between text-sm text-gray-600 pt-2 border-t">
+              <div className="grid grid-cols-2 gap-2 border-t pt-2 text-xs text-gray-600 sm:flex sm:justify-between sm:text-sm">
                 <span>Total: {formatCurrency(categoryData.total ?? 0)}</span>
                 <span>Monthly Avg: {formatCurrency(categoryData.monthly_avg ?? 0)}</span>
                 <span>Avg/Transaction: {formatCurrency(avgPerTxn)}</span>

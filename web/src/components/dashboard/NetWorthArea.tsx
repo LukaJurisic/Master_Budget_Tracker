@@ -3,12 +3,15 @@ import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YA
 import { formatCurrency, formatMonth } from '@/lib/formatters'
 import { DashboardLines } from '@/lib/api'
 import { EmptyState } from './EmptyState'
+import { useIsMobile } from '@/hooks/useIsMobile'
 
 interface NetWorthAreaProps {
   data: DashboardLines
 }
 
 export function NetWorthArea({ data }: NetWorthAreaProps) {
+  const isMobile = useIsMobile()
+
   if (!data?.networth_cumulative?.length) {
     return (
       <Card>
@@ -38,17 +41,19 @@ export function NetWorthArea({ data }: NetWorthAreaProps) {
         <CardDescription>Cumulative savings progression</CardDescription>
       </CardHeader>
       <CardContent>
-        <ResponsiveContainer width="100%" height={300}>
-          <AreaChart data={chartData} margin={{ top: 20, right: 30, left: 80, bottom: 70 }}>
+        <ResponsiveContainer width="100%" height={isMobile ? 240 : 300}>
+          <AreaChart data={chartData} margin={isMobile ? { top: 12, right: 8, left: 0, bottom: 20 } : { top: 20, right: 24, left: 64, bottom: 52 }}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis 
               dataKey="month" 
-              angle={-45}
-              textAnchor="end"
-              height={60}
-              fontSize={12}
+              angle={isMobile ? 0 : -35}
+              textAnchor={isMobile ? "middle" : "end"}
+              interval={isMobile ? "preserveStartEnd" : 0}
+              minTickGap={isMobile ? 16 : 8}
+              height={isMobile ? 30 : 60}
+              fontSize={isMobile ? 10 : 12}
             />
-            <YAxis tickFormatter={formatCurrency} width={70} />
+            <YAxis tickFormatter={formatCurrency} width={isMobile ? 44 : 70} tick={{ fontSize: isMobile ? 10 : 12 }} />
             <Tooltip 
               formatter={(value: number) => [formatCurrency(value), 'Net Worth']}
               labelFormatter={(label) => `Month: ${label}`}
