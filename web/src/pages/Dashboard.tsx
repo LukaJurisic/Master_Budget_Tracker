@@ -113,7 +113,7 @@ export default function Dashboard() {
   // Loading skeleton
   if (isLoading) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-4 sm:space-y-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="text-3xl font-bold">Dashboard</h1>
           <Button disabled>
@@ -133,24 +133,24 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold">Dashboard</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-2xl font-bold sm:text-3xl">Dashboard</h1>
+          <p className="text-sm text-muted-foreground sm:text-base">
             Financial overview for {formatMonthLong(effectiveMonth || selectedMonth)}
           </p>
         </div>
-        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+        <div className="grid grid-cols-1 gap-2 sm:flex sm:items-center sm:gap-4">
           <input
             type="month"
             value={selectedMonth}
             onChange={(e) => setSelectedMonth(e.target.value)}
             max={meta?.latest_data_month || getCurrentMonth()}
-            className="px-3 py-2 border rounded-lg w-full sm:w-auto"
+            className="h-10 w-full rounded-lg border px-3 py-2 text-sm sm:w-auto"
           />
-          <Button onClick={handleRefresh} disabled={isRefreshing} className="w-full sm:w-auto">
+          <Button onClick={handleRefresh} disabled={isRefreshing} className="h-10 w-full sm:w-auto">
             <RefreshCw className={`mr-2 h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
             Refresh Data
           </Button>
@@ -160,10 +160,10 @@ export default function Dashboard() {
       {/* Latest Available Banner */}
       {showFallbackBanner && (
         <Card className="border-yellow-200 bg-yellow-50">
-          <CardContent className="pt-6">
-            <div className="flex items-center space-x-2">
+          <CardContent className="pt-4 sm:pt-6">
+            <div className="flex items-start space-x-2">
               <AlertCircle className="h-4 w-4 text-yellow-600" />
-              <span className="text-yellow-800">
+              <span className="text-sm text-yellow-800 sm:text-base">
                 <strong>Latest available</strong> – {formatMonthLong(selectedMonth)} has no data. 
                 Showing {formatMonthLong(effectiveMonth || '')} instead.
               </span>
@@ -176,19 +176,19 @@ export default function Dashboard() {
       {safeCards && <CardsRow cards={safeCards} />}
 
       {/* Charts Row 1: Net Worth and Income vs Expenses */}
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-2 md:gap-6">
         {safeLines && <NetWorthArea data={safeLines} />}
         {safeLines && <IncomeVsExpensesLines data={safeLines} />}
       </div>
 
       {/* Charts Row 2: Category Breakdown */}
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-2 md:gap-6">
         {safeCategories && <CategoryDoughnut data={safeCategories} effectiveMonth={effectiveMonth || selectedMonth} />}
         {safeCategories && <TopCategoriesBar data={safeCategories} />}
       </div>
 
       {/* Bottom Row: Details and Merchants */}
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-2 md:gap-6">
         {safeCategories && <CategoryDetailsList data={safeCategories} />}
         {safeTopMerchants && <TopMerchants data={safeTopMerchants} />}
       </div>

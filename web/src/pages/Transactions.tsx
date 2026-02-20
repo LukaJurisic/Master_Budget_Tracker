@@ -767,8 +767,74 @@ export default function Transactions() {
         </CardContent>
       </Card>
 
-      {/* Transactions Table */}
-      <Card>
+      {/* Mobile Transaction Cards */}
+      <div className="space-y-3 md:hidden">
+        {transactions.length === 0 ? (
+          <Card>
+            <CardContent className="p-4 text-sm text-gray-600">
+              No transactions match your filters.
+            </CardContent>
+          </Card>
+        ) : (
+          transactions.map((txn: any) => (
+            <Card key={txn.id}>
+              <CardContent className="space-y-3 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-gray-900">
+                      {txn.merchant_raw || "Unknown merchant"}
+                    </p>
+                    <p className="truncate text-xs text-gray-500">{formatDate(txn.posted_date)}</p>
+                  </div>
+                  <span
+                    className={
+                      txn.txn_type === "income"
+                        ? "whitespace-nowrap text-sm font-semibold text-green-600"
+                        : "whitespace-nowrap text-sm font-semibold text-red-600"
+                    }
+                  >
+                    {formatAmount(txn.amount)}
+                  </span>
+                </div>
+
+                {txn.description_raw && (
+                  <p className="line-clamp-2 text-xs text-gray-600">{txn.description_raw}</p>
+                )}
+
+                <div className="grid grid-cols-2 gap-2 text-xs text-gray-500">
+                  <div className="rounded-md bg-gray-50 px-2 py-1.5">
+                    <span className="block text-[11px] uppercase tracking-wide text-gray-400">Source</span>
+                    <span>{txn.source || "-"}</span>
+                  </div>
+                  <div className="rounded-md bg-gray-50 px-2 py-1.5">
+                    <span className="block text-[11px] uppercase tracking-wide text-gray-400">Cleaned</span>
+                    <span className="block truncate">{txn.cleaned_final_merchant || "-"}</span>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-gray-700">Category</label>
+                  <select
+                    value={txn.category_id || ""}
+                    onChange={(e) => handleCategoryChange(txn.id, Number(e.target.value))}
+                    className="w-full rounded-md border p-2 text-sm"
+                  >
+                    <option value="">Uncategorized</option>
+                    {categories.map((cat: any) => (
+                      <option key={cat.id} value={cat.id}>
+                        {cat.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        )}
+      </div>
+
+      {/* Desktop Transactions Table */}
+      <Card className="hidden md:block">
         <CardContent className="p-0">
           <div className="overflow-x-auto">
             <Table className="min-w-[980px]">

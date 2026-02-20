@@ -127,19 +127,19 @@ function App() {
       {/* Main content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Top bar */}
-        <header className="sticky top-0 z-30 bg-white shadow-sm border-b">
-          <div className="px-4 sm:px-6 py-3 lg:py-4 flex items-center justify-between">
+        <header className="sticky top-0 z-30 border-b bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
+          <div className="flex items-center justify-between px-3 py-2.5 sm:px-6 lg:py-4">
             <Button
               variant="ghost"
               size="icon"
-              className="lg:hidden"
+              className="h-9 w-9 lg:hidden"
               onClick={() => setSidebarOpen(true)}
             >
-              <Menu className="h-6 w-6" />
+              <Menu className="h-5 w-5" />
             </Button>
 
             <div className="flex-1 px-2 lg:px-0 lg:flex lg:items-center lg:justify-between">
-              <h2 className="text-base lg:text-lg font-semibold text-gray-900">
+              <h2 className="text-[15px] font-semibold text-gray-900 sm:text-base lg:text-lg">
                 {currentPageName}
               </h2>
             </div>
@@ -147,9 +147,9 @@ function App() {
         </header>
 
         {/* Page content */}
-        <main className="flex-1 overflow-y-auto pb-24 lg:pb-0">
-          <div className="py-4 lg:py-6">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6">
+        <main className="flex-1 overflow-y-auto pb-20 lg:pb-0">
+          <div className="py-3 lg:py-6">
+            <div className="mx-auto max-w-7xl px-3 sm:px-6">
               <Routes>
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/analytics" element={<AnalyticsDashboard />} />
@@ -168,7 +168,7 @@ function App() {
 
         {/* Mobile bottom navigation */}
         <nav className="safe-area-bottom fixed bottom-0 left-0 right-0 z-40 border-t bg-white/95 backdrop-blur lg:hidden">
-          <div className="grid grid-cols-5">
+          <div className="mx-auto grid max-w-md grid-cols-5">
             {mobileNavigation.map((item) => {
               const isActive = isActiveRoute(location.pathname, item.href)
               return (
@@ -176,12 +176,12 @@ function App() {
                   key={item.name}
                   to={item.href}
                   className={cn(
-                    "flex flex-col items-center justify-center py-2 text-[11px] font-medium",
-                    isActive ? "text-primary" : "text-gray-500"
+                    "mx-1 my-1 flex flex-col items-center justify-center rounded-lg py-1.5 text-[11px] font-medium transition-colors",
+                    isActive ? "bg-blue-50 text-primary" : "text-gray-500 hover:bg-gray-100"
                   )}
                   onClick={() => setSidebarOpen(false)}
                 >
-                  <item.icon className="h-5 w-5 mb-1" />
+                  <item.icon className="mb-0.5 h-5 w-5" />
                   {item.name}
                 </Link>
               )

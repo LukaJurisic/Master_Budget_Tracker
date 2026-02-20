@@ -176,6 +176,9 @@ export default function Budgets() {
   const totalActual = budgetVsActual?.total_actual || 0
   const totalVariance = budgetVsActual?.total_variance || 0
   const variancePercent = budgetVsActual?.total_variance_percent || 0
+  const budgetItems = budgetVsActual?.budget_items || []
+  const budgetsWithoutSpending =
+    budgets?.filter((budget) => !budgetItems.some((item) => item.category.id === budget.category_id)) || []
 
   return (
     <div className="space-y-6">
@@ -290,140 +293,264 @@ export default function Budgets() {
               ))}
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <Table className="min-w-[860px]">
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Category</TableHead>
-                    <TableHead>Budget</TableHead>
-                    <TableHead>Actual</TableHead>
-                    <TableHead>Variance</TableHead>
-                    <TableHead>Progress</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                {budgetVsActual?.budget_items?.map((item) => (
-                  <TableRow key={item.category.id}>
-                    <TableCell>
-                      <div className="flex items-center space-x-2">
-                        {item.category.color && (
+            <>
+              <div className="space-y-3 md:hidden">
+                {budgetItems.map((item) => {
+                  const linkedBudget = budgets?.find((b) => b.category_id === item.category.id)
+                  const progressPct = item.budget_amount > 0 ? (item.actual_amount / item.budget_amount) * 100 : 0
+                  return (
+                    <Card key={item.category.id}>
+                      <CardContent className="space-y-3 p-4">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              {item.category.color && (
+                                <div
+                                  className="h-2.5 w-2.5 rounded-full"
+                                  style={{ backgroundColor: item.category.color }}
+                                />
+                              )}
+                              <p className="truncate font-medium">{item.category.name}</p>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              {Math.min(progressPct, 100).toFixed(0)}% used
+                            </p>
+                          </div>
+                          <span className={`text-sm font-semibold ${getVarianceColor(item.variance)}`}>
+                            {item.variance > 0 ? '+' : ''}{formatCurrency(item.variance)}
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2 text-sm">
+                          <div className="rounded-md bg-gray-50 p-2">
+                            <p className="text-[11px] uppercase tracking-wide text-gray-400">Budget</p>
+                            <p className="font-medium">{formatCurrency(item.budget_amount)}</p>
+                          </div>
+                          <div className="rounded-md bg-gray-50 p-2">
+                            <p className="text-[11px] uppercase tracking-wide text-gray-400">Actual</p>
+                            <p className="font-medium">{formatCurrency(item.actual_amount)}</p>
+                          </div>
+                        </div>
+
+                        <div className="h-2 w-full rounded-full bg-gray-200">
                           <div
-                            className="w-3 h-3 rounded-full"
-                            style={{ backgroundColor: item.category.color }}
+                            className={`h-2 rounded-full ${item.is_over_budget ? 'bg-red-500' : 'bg-green-500'}`}
+                            style={{ width: `${Math.min(progressPct, 100)}%` }}
                           />
-                        )}
-                        <span className="font-medium">{item.category.name}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="font-medium">
-                      {formatCurrency(item.budget_amount)}
-                    </TableCell>
-                    <TableCell className="font-medium">
-                      {formatCurrency(item.actual_amount)}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center space-x-2">
-                        <span className={getVarianceColor(item.variance)}>
-                          {item.variance > 0 ? '+' : ''}{formatCurrency(item.variance)}
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => linkedBudget && handleEditBudget(linkedBudget)}
+                            disabled={!linkedBudget}
+                          >
+                            <Edit2 className="mr-2 h-4 w-4" />
+                            Edit
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => linkedBudget && handleDeleteBudget(linkedBudget)}
+                            disabled={!linkedBudget}
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Delete
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )
+                })}
+
+                {budgetsWithoutSpending.map((budget) => (
+                  <Card key={budget.id}>
+                    <CardContent className="space-y-3 p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            {budget.category?.color && (
+                              <div
+                                className="h-2.5 w-2.5 rounded-full"
+                                style={{ backgroundColor: budget.category.color }}
+                              />
+                            )}
+                            <p className="truncate font-medium">{budget.category?.name}</p>
+                          </div>
+                          <p className="text-xs text-muted-foreground">0% used</p>
+                        </div>
+                        <span className="text-sm font-semibold text-green-600">
+                          -{formatCurrency(budget.amount)}
                         </span>
-                        <span className={`text-sm ${getVarianceColor(item.variance)}`}>
-                          ({item.variance_percent.toFixed(1)}%)
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <div className="rounded-md bg-gray-50 p-2">
+                          <p className="text-[11px] uppercase tracking-wide text-gray-400">Budget</p>
+                          <p className="font-medium">{formatCurrency(budget.amount)}</p>
+                        </div>
+                        <div className="rounded-md bg-gray-50 p-2">
+                          <p className="text-[11px] uppercase tracking-wide text-gray-400">Actual</p>
+                          <p className="font-medium">{formatCurrency(0)}</p>
+                        </div>
+                      </div>
+
+                      <div className="h-2 w-full rounded-full bg-gray-200" />
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <Button size="sm" variant="outline" onClick={() => handleEditBudget(budget)}>
+                          <Edit2 className="mr-2 h-4 w-4" />
+                          Edit
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => handleDeleteBudget(budget)}>
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Delete
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+
+                {budgetItems.length === 0 && budgetsWithoutSpending.length === 0 && (
+                  <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
+                    No budgets found for this month.
+                  </div>
+                )}
+              </div>
+
+              <div className="hidden overflow-x-auto md:block">
+                <Table className="min-w-[860px]">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Category</TableHead>
+                      <TableHead>Budget</TableHead>
+                      <TableHead>Actual</TableHead>
+                      <TableHead>Variance</TableHead>
+                      <TableHead>Progress</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                  {budgetItems.map((item) => {
+                    const progressPct = item.budget_amount > 0 ? (item.actual_amount / item.budget_amount) * 100 : 0
+                    return (
+                      <TableRow key={item.category.id}>
+                        <TableCell>
+                          <div className="flex items-center space-x-2">
+                            {item.category.color && (
+                              <div
+                                className="w-3 h-3 rounded-full"
+                                style={{ backgroundColor: item.category.color }}
+                              />
+                            )}
+                            <span className="font-medium">{item.category.name}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="font-medium">
+                          {formatCurrency(item.budget_amount)}
+                        </TableCell>
+                        <TableCell className="font-medium">
+                          {formatCurrency(item.actual_amount)}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center space-x-2">
+                            <span className={getVarianceColor(item.variance)}>
+                              {item.variance > 0 ? '+' : ''}{formatCurrency(item.variance)}
+                            </span>
+                            <span className={`text-sm ${getVarianceColor(item.variance)}`}>
+                              ({item.variance_percent.toFixed(1)}%)
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="w-full bg-gray-200 rounded-full h-2">
+                            <div
+                              className={`h-2 rounded-full ${item.is_over_budget ? 'bg-red-500' : 'bg-green-500'}`}
+                              style={{ width: `${Math.min(progressPct, 100)}%` }}
+                            />
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-1">
+                            {Math.min(progressPct, 100).toFixed(0)}% used
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center space-x-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleEditBudget(budgets?.find((b) => b.category_id === item.category.id))}
+                            >
+                              <Edit2 className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleDeleteBudget(budgets?.find((b) => b.category_id === item.category.id))}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
+                  
+                  {/* Show budgets without spending */}
+                  {budgetsWithoutSpending.map((budget) => (
+                    <TableRow key={budget.id}>
+                      <TableCell>
+                        <div className="flex items-center space-x-2">
+                          {budget.category?.color && (
+                            <div
+                              className="w-3 h-3 rounded-full"
+                              style={{ backgroundColor: budget.category.color }}
+                            />
+                          )}
+                          <span className="font-medium">{budget.category?.name}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="font-medium">
+                        {formatCurrency(budget.amount)}
+                      </TableCell>
+                      <TableCell className="font-medium">
+                        {formatCurrency(0)}
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-green-600">
+                          -{formatCurrency(budget.amount)} (-100%)
                         </span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div
-                          className={`h-2 rounded-full ${
-                            item.is_over_budget ? 'bg-red-500' : 'bg-green-500'
-                          }`}
-                          style={{
-                            width: `${Math.min((item.actual_amount / item.budget_amount) * 100, 100)}%`
-                          }}
-                        />
-                      </div>
-                      <div className="text-xs text-muted-foreground mt-1">
-                        {((item.actual_amount / item.budget_amount) * 100).toFixed(0)}% used
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center space-x-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleEditBudget(budgets?.find(b => b.category_id === item.category.id))}
-                        >
-                          <Edit2 className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleDeleteBudget(budgets?.find(b => b.category_id === item.category.id))}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-                
-                {/* Show budgets without spending */}
-                {budgets?.filter(budget => 
-                  !budgetVsActual?.budget_items?.some(item => item.category.id === budget.category_id)
-                ).map((budget) => (
-                  <TableRow key={budget.id}>
-                    <TableCell>
-                      <div className="flex items-center space-x-2">
-                        {budget.category?.color && (
-                          <div
-                            className="w-3 h-3 rounded-full"
-                            style={{ backgroundColor: budget.category.color }}
-                          />
-                        )}
-                        <span className="font-medium">{budget.category?.name}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="font-medium">
-                      {formatCurrency(budget.amount)}
-                    </TableCell>
-                    <TableCell className="font-medium">
-                      {formatCurrency(0)}
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-green-600">
-                        -{formatCurrency(budget.amount)} (-100%)
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div className="h-2 rounded-full bg-green-500" style={{ width: '0%' }} />
-                      </div>
-                      <div className="text-xs text-muted-foreground mt-1">0% used</div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center space-x-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleEditBudget(budget)}
-                        >
-                          <Edit2 className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleDeleteBudget(budget)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-                </TableBody>
-              </Table>
-            </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div className="h-2 rounded-full bg-green-500" style={{ width: '0%' }} />
+                        </div>
+                        <div className="text-xs text-muted-foreground mt-1">0% used</div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center space-x-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleEditBudget(budget)}
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleDeleteBudget(budget)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>
