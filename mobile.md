@@ -114,6 +114,9 @@
   - Known blocker:
     - `npm run build` currently fails due pre-existing TypeScript issues across unrelated files.
     - Use `build:mobile:quick` while we address type cleanup in parallel.
+  - Added Android bug-capture script at repo root:
+    - `capture-bug.ps1`
+    - Produces timestamped bundle with screenshot, UI tree, full logcat, app logcat, and metadata.
 
 ## Next Milestone
 - Android emulator loop (Windows):
@@ -124,5 +127,8 @@
 - Direct deploy path (Windows terminal):
   - `cd web/android`
   - `./gradlew.bat installDebug`
+- Fast bug capture (Windows terminal):
+  - `.\capture-bug.ps1 -Label "short-description"`
+  - Output goes to `artifacts\mobile-bugs\<timestamp>-<label>`
 - Define and test the first "monthly ritual" flow end-to-end on Android emulator.
 - iOS compile/sign/upload remains a macOS step.

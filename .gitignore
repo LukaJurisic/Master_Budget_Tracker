@@ -70,6 +70,7 @@ backups/
 temp/
 tmp/
 nul
+artifacts/mobile-bugs/
 
 # Screenshots and debug images
 bugs.png/
