@@ -5,7 +5,7 @@
 - Started: 2026-02-20
 
 ## Vision
-- Build a personal iOS app for monthly budget updates and daily glance checks.
+- Build a personal mobile app for monthly budget updates and daily glance checks.
 - Optimize for joy and low maintenance first.
 - Keep architecture ready to expand to multi-user SaaS later.
 
@@ -28,6 +28,7 @@
 
 ## Technical Direction
 - Near-term mobile path: wrap existing React app with Capacitor for iOS.
+- Near-term execution order on Windows: Android first (emulator), then iOS release prep later.
 - Keep existing FastAPI backend for data/workflows.
 - Keep single-user model for now (no auth overhaul yet).
 - Add seams now for future multi-user:
@@ -80,6 +81,7 @@
   - Linked workflow to local `app_store_cheat_sheet` repo.
   - Installed Capacitor packages in `web`:
     - `@capacitor/core`
+    - `@capacitor/android`
     - `@capacitor/ios`
     - `@capacitor/cli`
   - Initialized Capacitor:
@@ -87,13 +89,18 @@
     - App ID: `com.lukajurisic.budgettracker`
     - Web dir: `dist`
   - Added iOS platform scaffold at `web/ios`.
+  - Added Android platform scaffold at `web/android`.
   - Added mobile scripts in `web/package.json`:
     - `build:mobile`
     - `build:mobile:quick`
+    - `build:android:quick`
     - `cap:sync`
+    - `cap:sync:android`
     - `cap:copy`
     - `cap:open:ios`
+    - `cap:open:android`
     - `cap:run:ios`
+    - `cap:run:android`
   - Applied mobile UX optimization while keeping desktop behavior:
     - Bottom tab bar on mobile in `web/src/App.tsx`
     - Sticky top header + safe area spacing
@@ -102,14 +109,20 @@
     - Removed dead state in transactions to keep strict TypeScript builds clean
   - Verified mobile asset pipeline:
     - `npm run build:mobile:quick` works and syncs to iOS shell.
+    - `npm run build:android:quick` works and syncs to Android shell.
+    - `./gradlew.bat installDebug` succeeded and installed on emulator `Medium_Phone_API_36.1`.
   - Known blocker:
     - `npm run build` currently fails due pre-existing TypeScript issues across unrelated files.
     - Use `build:mobile:quick` while we address type cleanup in parallel.
 
 ## Next Milestone
-- Build and sync web assets:
+- Android emulator loop (Windows):
   - `cd web`
-  - `npm run build:mobile`
-- Open in Xcode on Mac:
-  - `npm run cap:open:ios`
-- Define and test the first "monthly ritual" flow end-to-end on iPhone simulator.
+  - `npm run build:android:quick`
+  - `npm run cap:open:android`
+  - Run on emulator from Android Studio
+- Direct deploy path (Windows terminal):
+  - `cd web/android`
+  - `./gradlew.bat installDebug`
+- Define and test the first "monthly ritual" flow end-to-end on Android emulator.
+- iOS compile/sign/upload remains a macOS step.
