@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { apiClient, UnmappedPair } from '@/lib/api'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import StagingTab from '@/components/mapping/StagingTab'
+import { useIsMobile } from '@/hooks/useIsMobile'
 
 interface RuleModalProps {
   isOpen: boolean
@@ -196,6 +197,7 @@ export default function MappingStudio() {
   const [selectedMerchant, setSelectedMerchant] = useState<any>(null)
   const [editingRule, setEditingRule] = useState<any>(null)
   const [quickAssignData, setQuickAssignData] = useState<Record<string, { category_id: string; subcategory_id: string }>>({})
+  const isMobile = useIsMobile()
 
   // Ref for scroll container to enable proper collision boundary
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -330,16 +332,16 @@ export default function MappingStudio() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className={isMobile ? 'space-y-4' : 'space-y-6'}>
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className={isMobile ? 'flex flex-col gap-3' : 'flex items-center justify-between'}>
         <div>
-          <h1 className="text-3xl font-bold">Mapping Studio</h1>
+          <h1 className={isMobile ? 'text-2xl font-bold' : 'text-3xl font-bold'}>Mapping Studio</h1>
           <p className="text-muted-foreground">
             Manage merchant categorization rules and review unmapped transactions
           </p>
         </div>
-        <Button onClick={() => handleCreateRule()}>
+        <Button onClick={() => handleCreateRule()} className={isMobile ? 'w-full' : ''}>
           <Plus className="mr-2 h-4 w-4" />
           New Rule
         </Button>
@@ -347,10 +349,10 @@ export default function MappingStudio() {
 
       {/* Tabs */}
       <div className="border-b">
-        <nav className="-mb-px flex space-x-8">
+        <nav className="-mb-px flex gap-4 overflow-x-auto pb-1">
           <button
             onClick={() => setActiveTab('staging')}
-            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+            className={`shrink-0 border-b-2 px-1 py-2 text-sm font-medium ${
               activeTab === 'staging'
                 ? 'border-primary text-primary'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -363,7 +365,7 @@ export default function MappingStudio() {
           </button>
           <button
             onClick={() => setActiveTab('quick-assign')}
-            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+            className={`shrink-0 border-b-2 px-1 py-2 text-sm font-medium ${
               activeTab === 'quick-assign'
                 ? 'border-primary text-primary'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -378,7 +380,7 @@ export default function MappingStudio() {
           </button>
           <button
             onClick={() => setActiveTab('unmapped')}
-            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+            className={`shrink-0 border-b-2 px-1 py-2 text-sm font-medium ${
               activeTab === 'unmapped'
                 ? 'border-primary text-primary'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -393,7 +395,7 @@ export default function MappingStudio() {
           </button>
           <button
             onClick={() => setActiveTab('rules')}
-            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+            className={`shrink-0 border-b-2 px-1 py-2 text-sm font-medium ${
               activeTab === 'rules'
                 ? 'border-primary text-primary'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -432,62 +434,46 @@ export default function MappingStudio() {
               </div>
             ) : (
               <>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Description</TableHead>
-                      <TableHead>Merchant</TableHead>
-                      <TableHead>Count</TableHead>
-                      <TableHead>Total</TableHead>
-                      <TableHead>Category</TableHead>
-                      <TableHead>Subcategory</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
+                {isMobile ? (
+                  <div className="space-y-3">
                     {unmappedPairs?.map((pair) => {
                       const pairKey = `${pair.merchant_norm}|${pair.description_norm}`
                       const selectedCategoryId = quickAssignData[pairKey]?.category_id || ''
                       const selectedSubcategoryId = quickAssignData[pairKey]?.subcategory_id || ''
-                      
-                      
+
                       return (
-                        <TableRow key={pairKey}>
-                          <TableCell>
-                            <div className="font-medium text-sm max-w-xs truncate" title={pair.description_norm}>
-                              {pair.description_norm}
+                        <div key={pairKey} className="rounded-lg border p-3">
+                          <p className="truncate text-sm font-semibold" title={pair.description_norm}>{pair.description_norm}</p>
+                          <p className="truncate text-sm text-muted-foreground" title={pair.merchant_norm}>{pair.merchant_norm}</p>
+                          <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
+                            <div className="rounded-md bg-muted/40 p-2">
+                              <p className="text-[11px] text-muted-foreground">Count</p>
+                              <p className="font-semibold">{pair.count}</p>
                             </div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="font-medium text-sm max-w-xs truncate" title={pair.merchant_norm}>
-                              {pair.merchant_norm}
+                            <div className="rounded-md bg-muted/40 p-2">
+                              <p className="text-[11px] text-muted-foreground">Total</p>
+                              <p className="font-semibold">{formatCurrency(pair.total_amount)}</p>
                             </div>
-                          </TableCell>
-                          <TableCell>{pair.count}</TableCell>
-                          <TableCell className="font-medium">
-                            {formatCurrency(pair.total_amount)}
-                          </TableCell>
-                          <TableCell>
+                          </div>
+
+                          <div className="mt-3">
                             <Select
                               value={selectedCategoryId}
                               onValueChange={(value) => {
                                 if (value && value !== '') {
-                                  // Find the selected category and determine if it's parent or child
                                   const selectedCategory = sortedCategories.find(cat => cat.id.toString() === value);
                                   if (selectedCategory) {
                                     let categoryId: number;
                                     let subcategoryId: number | undefined;
-                                    
+
                                     if (selectedCategory.parent_id) {
-                                      // This is a subcategory
                                       categoryId = selectedCategory.parent_id;
                                       subcategoryId = selectedCategory.id;
                                     } else {
-                                      // This is a parent category
                                       categoryId = selectedCategory.id;
                                       subcategoryId = undefined;
                                     }
-                                    
-                                    // Update the state properly
+
                                     handleQuickAssignChange(pairKey, 'category_id', categoryId.toString());
                                     if (subcategoryId) {
                                       handleQuickAssignChange(pairKey, 'subcategory_id', subcategoryId.toString());
@@ -498,21 +484,17 @@ export default function MappingStudio() {
                                 }
                               }}
                             >
-                              <SelectTrigger className="h-8 min-h-8 w-full">
+                              <SelectTrigger className="h-9 min-h-9 w-full">
                                 <SelectValue placeholder="Select Category" />
                               </SelectTrigger>
-                              
                               <SelectContent position="popper" side="bottom" align="start" sideOffset={6} avoidCollisions className="z-50 w-[300px] max-h-[min(320px,calc(100vh-8rem))] overflow-auto">
                                 {sortedCategories?.length > 0 ? (
                                   <>
-                                    {/* Parent categories first */}
                                     {parentCategories.map(parent => (
                                       <SelectItem key={parent.id} value={parent.id.toString()} className="font-medium">
                                         {parent.name}
                                       </SelectItem>
                                     ))}
-                                    
-                                    {/* Then subcategories with hierarchy */}
                                     {sortedCategories.filter(cat => cat.parent_id).map(child => (
                                       <SelectItem key={child.id} value={child.id.toString()} className="pl-4 text-sm text-muted-foreground">
                                         {getCategoryDisplayName(child)}
@@ -524,29 +506,133 @@ export default function MappingStudio() {
                                 )}
                               </SelectContent>
                             </Select>
-                          </TableCell>
-                          <TableCell>
-                            {/* Show selected subcategory name for clarity */}
-                            <div className="text-sm text-muted-foreground">
-                              {selectedSubcategoryId ? (
-                                sortedCategories.find(cat => cat.id.toString() === selectedSubcategoryId)?.name || 'Auto-selected'
-                              ) : (
-                                selectedCategoryId ? 'Parent category' : '-'
-                              )}
-                            </div>
-                          </TableCell>
-                        </TableRow>
+                          </div>
+                          <p className="mt-2 text-xs text-muted-foreground">
+                            {selectedSubcategoryId
+                              ? sortedCategories.find(cat => cat.id.toString() === selectedSubcategoryId)?.name || 'Auto-selected'
+                              : selectedCategoryId ? 'Parent category' : 'No category selected'}
+                          </p>
+                        </div>
                       )
                     })}
-                  </TableBody>
-                </Table>
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Description</TableHead>
+                        <TableHead>Merchant</TableHead>
+                        <TableHead>Count</TableHead>
+                        <TableHead>Total</TableHead>
+                        <TableHead>Category</TableHead>
+                        <TableHead>Subcategory</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {unmappedPairs?.map((pair) => {
+                        const pairKey = `${pair.merchant_norm}|${pair.description_norm}`
+                        const selectedCategoryId = quickAssignData[pairKey]?.category_id || ''
+                        const selectedSubcategoryId = quickAssignData[pairKey]?.subcategory_id || ''
+
+
+                        return (
+                          <TableRow key={pairKey}>
+                            <TableCell>
+                              <div className="font-medium text-sm max-w-xs truncate" title={pair.description_norm}>
+                                {pair.description_norm}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="font-medium text-sm max-w-xs truncate" title={pair.merchant_norm}>
+                                {pair.merchant_norm}
+                              </div>
+                            </TableCell>
+                            <TableCell>{pair.count}</TableCell>
+                            <TableCell className="font-medium">
+                              {formatCurrency(pair.total_amount)}
+                            </TableCell>
+                            <TableCell>
+                              <Select
+                                value={selectedCategoryId}
+                                onValueChange={(value) => {
+                                  if (value && value !== '') {
+                                    // Find the selected category and determine if it's parent or child
+                                    const selectedCategory = sortedCategories.find(cat => cat.id.toString() === value);
+                                    if (selectedCategory) {
+                                      let categoryId: number;
+                                      let subcategoryId: number | undefined;
+
+                                      if (selectedCategory.parent_id) {
+                                        // This is a subcategory
+                                        categoryId = selectedCategory.parent_id;
+                                        subcategoryId = selectedCategory.id;
+                                      } else {
+                                        // This is a parent category
+                                        categoryId = selectedCategory.id;
+                                        subcategoryId = undefined;
+                                      }
+
+                                      // Update the state properly
+                                      handleQuickAssignChange(pairKey, 'category_id', categoryId.toString());
+                                      if (subcategoryId) {
+                                        handleQuickAssignChange(pairKey, 'subcategory_id', subcategoryId.toString());
+                                      } else {
+                                        handleQuickAssignChange(pairKey, 'subcategory_id', '');
+                                      }
+                                    }
+                                  }
+                                }}
+                              >
+                                <SelectTrigger className="h-8 min-h-8 w-full">
+                                  <SelectValue placeholder="Select Category" />
+                                </SelectTrigger>
+
+                                <SelectContent position="popper" side="bottom" align="start" sideOffset={6} avoidCollisions className="z-50 w-[300px] max-h-[min(320px,calc(100vh-8rem))] overflow-auto">
+                                  {sortedCategories?.length > 0 ? (
+                                    <>
+                                      {/* Parent categories first */}
+                                      {parentCategories.map(parent => (
+                                        <SelectItem key={parent.id} value={parent.id.toString()} className="font-medium">
+                                          {parent.name}
+                                        </SelectItem>
+                                      ))}
+
+                                      {/* Then subcategories with hierarchy */}
+                                      {sortedCategories.filter(cat => cat.parent_id).map(child => (
+                                        <SelectItem key={child.id} value={child.id.toString()} className="pl-4 text-sm text-muted-foreground">
+                                          {getCategoryDisplayName(child)}
+                                        </SelectItem>
+                                      ))}
+                                    </>
+                                  ) : (
+                                    <SelectItem value="" disabled>No categories available</SelectItem>
+                                  )}
+                                </SelectContent>
+                              </Select>
+                            </TableCell>
+                            <TableCell>
+                              {/* Show selected subcategory name for clarity */}
+                              <div className="text-sm text-muted-foreground">
+                                {selectedSubcategoryId ? (
+                                  sortedCategories.find(cat => cat.id.toString() === selectedSubcategoryId)?.name || 'Auto-selected'
+                                ) : (
+                                  selectedCategoryId ? 'Parent category' : '-'
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        )
+                      })}
+                    </TableBody>
+                  </Table>
+                )}
                 
                 {unmappedPairs && unmappedPairs.length > 0 && (
                   <div className="mt-6 flex justify-end">
                     <Button 
                       onClick={handleBulkAssign}
                       disabled={bulkAssignMutation.isPending || Object.keys(quickAssignData).length === 0}
-                      className="flex items-center space-x-2"
+                      className={isMobile ? 'flex w-full items-center justify-center space-x-2' : 'flex items-center space-x-2'}
                     >
                       <Check className="h-4 w-4" />
                       <span>Confirm Assignments ({Object.entries(quickAssignData).filter(([_, data]) => data.category_id).length})</span>
@@ -581,48 +667,83 @@ export default function MappingStudio() {
                 ))}
               </div>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Merchant</TableHead>
-                    <TableHead>Count</TableHead>
-                    <TableHead>Total Amount</TableHead>
-                    <TableHead>Date Range</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+              isMobile ? (
+                <div className="space-y-3">
                   {unmappedMerchants?.map((merchant) => (
-                    <TableRow key={merchant.merchant_norm}>
-                      <TableCell>
-                        <div className="font-medium">{merchant.merchant_norm}</div>
-                      </TableCell>
-                      <TableCell>{merchant.count}</TableCell>
-                      <TableCell className="font-medium">
-                        {formatCurrency(merchant.total_amount)}
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-sm text-muted-foreground">
-                          {formatDate(merchant.first_seen)} - {formatDate(merchant.last_seen)}
+                    <div key={merchant.merchant_norm} className="rounded-lg border p-3">
+                      <p className="font-medium">{merchant.merchant_norm}</p>
+                      <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
+                        <div className="rounded-md bg-muted/40 p-2">
+                          <p className="text-[11px] text-muted-foreground">Count</p>
+                          <p className="font-semibold">{merchant.count}</p>
                         </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center space-x-2">
-                          <Button
-                            size="sm"
-                            onClick={() => handleCreateRule(merchant)}
-                          >
-                            Create Rule
-                          </Button>
-                          <Button size="sm" variant="outline">
-                            <Eye className="h-4 w-4" />
-                          </Button>
+                        <div className="rounded-md bg-muted/40 p-2">
+                          <p className="text-[11px] text-muted-foreground">Total</p>
+                          <p className="font-semibold">{formatCurrency(merchant.total_amount)}</p>
                         </div>
-                      </TableCell>
-                    </TableRow>
+                      </div>
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        {formatDate(merchant.first_seen)} - {formatDate(merchant.last_seen)}
+                      </p>
+                      <div className="mt-3 grid grid-cols-2 gap-2">
+                        <Button
+                          size="sm"
+                          onClick={() => handleCreateRule(merchant)}
+                          className="w-full"
+                        >
+                          Create Rule
+                        </Button>
+                        <Button size="sm" variant="outline" className="w-full">
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
                   ))}
-                </TableBody>
-              </Table>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Merchant</TableHead>
+                      <TableHead>Count</TableHead>
+                      <TableHead>Total Amount</TableHead>
+                      <TableHead>Date Range</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {unmappedMerchants?.map((merchant) => (
+                      <TableRow key={merchant.merchant_norm}>
+                        <TableCell>
+                          <div className="font-medium">{merchant.merchant_norm}</div>
+                        </TableCell>
+                        <TableCell>{merchant.count}</TableCell>
+                        <TableCell className="font-medium">
+                          {formatCurrency(merchant.total_amount)}
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-sm text-muted-foreground">
+                            {formatDate(merchant.first_seen)} - {formatDate(merchant.last_seen)}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center space-x-2">
+                            <Button
+                              size="sm"
+                              onClick={() => handleCreateRule(merchant)}
+                            >
+                              Create Rule
+                            </Button>
+                            <Button size="sm" variant="outline">
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )
             )}
           </CardContent>
         </Card>
@@ -650,115 +771,185 @@ export default function MappingStudio() {
                 ))}
               </div>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Pattern</TableHead>
-                    <TableHead>Merchant</TableHead>
-                    <TableHead>Category</TableHead>
-                    <TableHead>Priority</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+              isMobile ? (
+                <div className="space-y-3">
                   {rules?.map((rule) => (
-                    <TableRow key={rule.id}>
-                      <TableCell>
-                        <div className="space-y-1">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            rule.rule_type === 'EXACT' ? 'bg-green-100 text-green-800' :
-                            rule.rule_type === 'CONTAINS' ? 'bg-blue-100 text-blue-800' :
-                            'bg-purple-100 text-purple-800'
-                          }`}>
-                            {rule.rule_type}
-                          </span>
-                          <div>
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                              rule.fields === 'MERCHANT' ? 'bg-gray-100 text-gray-800' :
-                              rule.fields === 'DESCRIPTION' ? 'bg-orange-100 text-orange-800' :
-                              'bg-indigo-100 text-indigo-800'
-                            }`}>
-                              {rule.fields}
-                            </span>
-                          </div>
+                    <div key={rule.id} className="rounded-lg border p-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                          rule.rule_type === 'EXACT' ? 'bg-green-100 text-green-800' :
+                          rule.rule_type === 'CONTAINS' ? 'bg-blue-100 text-blue-800' :
+                          'bg-purple-100 text-purple-800'
+                        }`}>
+                          {rule.rule_type}
+                        </span>
+                        <span className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium ${
+                          rule.fields === 'MERCHANT' ? 'bg-gray-100 text-gray-800' :
+                          rule.fields === 'DESCRIPTION' ? 'bg-orange-100 text-orange-800' :
+                          'bg-indigo-100 text-indigo-800'
+                        }`}>
+                          {rule.fields}
+                        </span>
+                        <span className="text-xs text-muted-foreground">Priority {rule.priority}</span>
+                      </div>
+
+                      <div className="mt-2">
+                        <code className="rounded bg-gray-100 px-2 py-1 text-sm">{rule.pattern}</code>
+                        {rule.desc_pattern && (
+                          <p className="mt-1 text-xs text-muted-foreground">Desc: {rule.desc_pattern}</p>
+                        )}
+                      </div>
+
+                      <div className="mt-3 space-y-1">
+                        <div className="flex items-center gap-2">
+                          {rule.category?.color && (
+                            <div className="h-3 w-3 rounded-full" style={{ backgroundColor: rule.category.color }} />
+                          )}
+                          <span className="text-sm font-medium">{rule.category?.name}</span>
                         </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="space-y-1">
-                          <div>
-                            <code className="text-sm bg-gray-100 px-2 py-1 rounded">
-                              {rule.pattern}
-                            </code>
+                        {rule.subcategory && (
+                          <div className="flex items-center gap-2">
+                            {rule.subcategory?.color && (
+                              <div className="h-2 w-2 rounded-full" style={{ backgroundColor: rule.subcategory.color }} />
+                            )}
+                            <span className="text-sm text-muted-foreground">{rule.subcategory?.name}</span>
                           </div>
-                          {rule.desc_pattern && (
+                        )}
+                      </div>
+
+                      <div className="mt-3 grid grid-cols-2 gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleEditRule(rule)}
+                          className="w-full"
+                        >
+                          <Edit2 className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleDeleteRule(rule)}
+                          disabled={deleteRuleMutation.isPending}
+                          className="w-full"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Pattern</TableHead>
+                      <TableHead>Merchant</TableHead>
+                      <TableHead>Category</TableHead>
+                      <TableHead>Priority</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {rules?.map((rule) => (
+                      <TableRow key={rule.id}>
+                        <TableCell>
+                          <div className="space-y-1">
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                              rule.rule_type === 'EXACT' ? 'bg-green-100 text-green-800' :
+                              rule.rule_type === 'CONTAINS' ? 'bg-blue-100 text-blue-800' :
+                              'bg-purple-100 text-purple-800'
+                            }`}>
+                              {rule.rule_type}
+                            </span>
                             <div>
-                              <span className="text-xs text-muted-foreground">Desc:</span>
-                              <code className="text-sm bg-orange-50 px-2 py-1 rounded ml-1">
-                                {rule.desc_pattern}
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                                rule.fields === 'MERCHANT' ? 'bg-gray-100 text-gray-800' :
+                                rule.fields === 'DESCRIPTION' ? 'bg-orange-100 text-orange-800' :
+                                'bg-indigo-100 text-indigo-800'
+                              }`}>
+                                {rule.fields}
+                              </span>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="space-y-1">
+                            <div>
+                              <code className="text-sm bg-gray-100 px-2 py-1 rounded">
+                                {rule.pattern}
                               </code>
                             </div>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="space-y-1">
-                          <div className="font-medium">{rule.pattern}</div>
-                          {rule.desc_pattern && (
-                            <div className="text-sm text-muted-foreground">
-                              + {rule.desc_pattern}
-                            </div>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="space-y-1">
-                          <div className="flex items-center space-x-2">
-                            {rule.category?.color && (
-                              <div
-                                className="w-3 h-3 rounded-full"
-                                style={{ backgroundColor: rule.category.color }}
-                              />
+                            {rule.desc_pattern && (
+                              <div>
+                                <span className="text-xs text-muted-foreground">Desc:</span>
+                                <code className="text-sm bg-orange-50 px-2 py-1 rounded ml-1">
+                                  {rule.desc_pattern}
+                                </code>
+                              </div>
                             )}
-                            <span className="font-medium">{rule.category?.name}</span>
                           </div>
-                          {rule.subcategory && (
-                            <div className="flex items-center space-x-2 ml-5">
-                              {rule.subcategory?.color && (
+                        </TableCell>
+                        <TableCell>
+                          <div className="space-y-1">
+                            <div className="font-medium">{rule.pattern}</div>
+                            {rule.desc_pattern && (
+                              <div className="text-sm text-muted-foreground">
+                                + {rule.desc_pattern}
+                              </div>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="space-y-1">
+                            <div className="flex items-center space-x-2">
+                              {rule.category?.color && (
                                 <div
-                                  className="w-2 h-2 rounded-full"
-                                  style={{ backgroundColor: rule.subcategory.color }}
+                                  className="w-3 h-3 rounded-full"
+                                  style={{ backgroundColor: rule.category.color }}
                                 />
                               )}
-                              <span className="text-sm text-muted-foreground">{rule.subcategory?.name}</span>
+                              <span className="font-medium">{rule.category?.name}</span>
                             </div>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>{rule.priority}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center space-x-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleEditRule(rule)}
-                          >
-                            <Edit2 className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleDeleteRule(rule)}
-                            disabled={deleteRuleMutation.isPending}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                            {rule.subcategory && (
+                              <div className="flex items-center space-x-2 ml-5">
+                                {rule.subcategory?.color && (
+                                  <div
+                                    className="w-2 h-2 rounded-full"
+                                    style={{ backgroundColor: rule.subcategory.color }}
+                                  />
+                                )}
+                                <span className="text-sm text-muted-foreground">{rule.subcategory?.name}</span>
+                              </div>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>{rule.priority}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center space-x-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleEditRule(rule)}
+                            >
+                              <Edit2 className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleDeleteRule(rule)}
+                              disabled={deleteRuleMutation.isPending}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )
             )}
           </CardContent>
         </Card>

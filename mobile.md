@@ -183,3 +183,36 @@
   - Output goes to `artifacts\mobile-bugs\<timestamp>-<label>`
 - Define and test the first "monthly ritual" flow end-to-end on Android emulator.
 - iOS compile/sign/upload remains a macOS step.
+  - Mobile-native pass (post-analytics) for remaining core pages:
+    - `web/src/pages/MappingStudio.tsx`
+      - Mobile-first header/action layout.
+      - Horizontally scrollable tab rail.
+      - Card-based mobile views for Quick Assign, Unmapped Merchants, and Mapping Rules.
+      - Full-width primary action for bulk confirm on phone.
+    - `web/src/pages/SourcesEnhanced.tsx`
+      - Mobile-first header and CTA stacking.
+      - Institution action buttons converted to stacked phone actions.
+      - Account rows reflowed for touch-first toggles.
+      - Import modal controls reflowed for one-handed interaction.
+    - `web/src/pages/Income.tsx`
+      - Mobile-first page/chrome spacing.
+      - Mobile editable card rows for income entries (desktop table preserved).
+      - Phone-friendly date/search/import toolbar and modal controls.
+    - `web/src/pages/BalancesPage.tsx`
+      - Mobile-first header and action stack.
+      - NDAX section reflow for phone cards.
+      - Accounts rendering now card-based on mobile via `web/src/components/balances/AccountsTable.tsx`.
+  - Mobile detection hardening:
+    - Updated `web/src/hooks/useIsMobile.ts` to treat Capacitor native runtime as mobile and to use coarse-pointer/touch/UA fallbacks.
+    - This fixes WebView cases where CSS width can trigger desktop breakpoints unexpectedly.
+  - Validation/build:
+    - `npm run build:mobile:quick` succeeded (vite build + cap sync).
+    - `web/android/gradlew.bat installDebug` succeeded and redeployed to emulator.
+  - New validation captures:
+    - `artifacts/mobile-bugs/20260220-130150-home-mobile-pass4/screenshot.png`
+    - `artifacts/mobile-bugs/20260220-130154-txns-mobile-pass4/screenshot.png`
+    - `artifacts/mobile-bugs/20260220-130159-map-mobile-pass4/screenshot.png`
+    - `artifacts/mobile-bugs/20260220-130204-budgets-mobile-pass4/screenshot.png`
+    - `artifacts/mobile-bugs/20260220-130209-more-mobile-pass4/screenshot.png`
+  - Note from latest captures:
+    - Emulator session showed missing backend data (`Failed to fetch` on Transactions), so visual validation focused on layout/interaction flow rather than data-density content.

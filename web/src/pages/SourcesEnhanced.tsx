@@ -15,6 +15,7 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
 import { useAppMode } from "@/contexts/AppModeContext";
+import { useIsMobile } from "@/hooks/useIsMobile";
 
 interface PlaidAccount {
   id: number;
@@ -113,6 +114,7 @@ export default function SourcesEnhanced() {
   const [showAccountSelection, setShowAccountSelection] = useState(false);
   const [updateLinkToken, setUpdateLinkToken] = useState<string | null>(null);
   const [updateItemId, setUpdateItemId] = useState<number | null>(null);
+  const isMobile = useIsMobile();
   const { toast } = useToast();
   const { isDemo, features } = useAppMode();
 
@@ -351,15 +353,15 @@ export default function SourcesEnhanced() {
   }, {} as Record<number, { name: string; accounts: PlaidAccount[] }>);
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className={isMobile ? "space-y-4" : "space-y-6"}>
+      <div className={isMobile ? "flex flex-col gap-3" : "flex items-center justify-between"}>
         <div>
-          <h1 className="text-3xl font-bold">Data Sources</h1>
+          <h1 className={isMobile ? "text-2xl font-bold" : "text-3xl font-bold"}>Data Sources</h1>
           <p className="text-muted-foreground">
             Connect your bank accounts and manage data imports
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className={isMobile ? "grid grid-cols-1 gap-2" : "grid grid-cols-2 gap-2"}>
           {accounts.length > 0 && (
             <Button 
               onClick={() => {
@@ -372,6 +374,7 @@ export default function SourcesEnhanced() {
                 setIsImportModalOpen(true);
               }}
               variant="default"
+              className="w-full"
             >
               <Download className="mr-2 h-4 w-4" />
               Import All
@@ -384,6 +387,7 @@ export default function SourcesEnhanced() {
                   <Button 
                     onClick={getLinkToken} 
                     disabled={isGettingToken || !!linkToken || !features.plaid_enabled}
+                    className="w-full"
                   >
                     <Building2 className="mr-2 h-4 w-4" />
                     {isGettingToken ? "Getting Token..." : linkToken ? "Token Ready" : "Connect New Bank"}
@@ -431,18 +435,19 @@ export default function SourcesEnhanced() {
         {Object.entries(accountsByInstitution).map(([itemId, institution]) => (
           <Card key={itemId}>
             <CardHeader>
-              <div className="flex items-center justify-between">
+              <div className={isMobile ? "flex flex-col gap-3" : "flex items-center justify-between"}>
                 <CardTitle className="flex items-center gap-2">
                   <Building2 className="h-5 w-5" />
                   {institution.name}
                 </CardTitle>
-                <div className="flex gap-2">
+                <div className={isMobile ? "grid grid-cols-1 gap-2" : "grid grid-cols-3 gap-2"}>
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => getUpdateLinkToken(Number(itemId))}
                     disabled={isGettingToken}
                     title="Re-authenticate this bank connection"
+                    className="w-full"
                   >
                     <AlertCircle className="mr-2 h-4 w-4" />
                     Re-authenticate
@@ -459,6 +464,7 @@ export default function SourcesEnhanced() {
                       setImportMode("sync");
                       setIsImportModalOpen(true);
                     }}
+                    className="w-full"
                   >
                     <RefreshCw className="mr-2 h-4 w-4" />
                     Sync New
@@ -475,6 +481,7 @@ export default function SourcesEnhanced() {
                       setImportMode("date-range");
                       setIsImportModalOpen(true);
                     }}
+                    className="w-full"
                   >
                     <Download className="mr-2 h-4 w-4" />
                     Import Range
@@ -487,26 +494,39 @@ export default function SourcesEnhanced() {
                 {institution.accounts.map((account) => (
                   <div
                     key={account.id}
-                    className="flex items-center justify-between p-3 rounded-lg border"
+                    className="rounded-lg border p-3"
                   >
-                    <div className="flex items-center gap-3">
-                      <CreditCard className="h-5 w-5 text-muted-foreground" />
-                      <div>
-                        <p className="font-medium">{account.name}</p>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex min-w-0 items-center gap-3">
+                        <CreditCard className="mt-0.5 h-5 w-5 text-muted-foreground" />
+                        <div className="min-w-0">
+                          <p className="truncate font-medium">{account.name}</p>
                         <p className="text-sm text-muted-foreground">
                           ****{account.mask} • {account.type}
                         </p>
+                        </div>
                       </div>
+                      {!isMobile && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-muted-foreground">
+                            Include in imports
+                          </span>
+                          <Switch
+                            checked={account.is_enabled_for_import}
+                            onCheckedChange={() => toggleAccountImport(account.id)}
+                          />
+                        </div>
+                      )}
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-muted-foreground">
-                        Include in imports
-                      </span>
-                      <Switch
-                        checked={account.is_enabled_for_import}
-                        onCheckedChange={() => toggleAccountImport(account.id)}
-                      />
-                    </div>
+                    {isMobile && (
+                      <div className="mt-3 flex items-center justify-between rounded-md bg-muted/30 px-3 py-2">
+                        <span className="text-sm text-muted-foreground">Include in imports</span>
+                        <Switch
+                          checked={account.is_enabled_for_import}
+                          onCheckedChange={() => toggleAccountImport(account.id)}
+                        />
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -526,11 +546,11 @@ export default function SourcesEnhanced() {
               {imports.slice(0, 5).map((imp) => (
                 <div
                   key={imp.id}
-                  className="flex items-center justify-between p-3 rounded-lg border hover:bg-accent cursor-pointer"
+                  className="cursor-pointer rounded-lg border p-3 transition-colors hover:bg-accent"
                   onClick={() => window.location.href = `/mapping?tab=staging&importId=${encodeURIComponent(imp.id)}`}
                 >
-                  <div>
-                    <p className="font-medium">
+                  <div className={isMobile ? "flex flex-col gap-2" : "flex items-center justify-between"}>
+                    <p className="truncate font-medium">
                       {imp.institution_name} - {imp.mode === "sync" ? "Sync" : "Manual Import"}
                     </p>
                     <p className="text-sm text-muted-foreground">
@@ -540,7 +560,7 @@ export default function SourcesEnhanced() {
                       }
                     </p>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     {imp.summary.needs_category > 0 && (
                       <Badge variant="secondary">
                         {imp.summary.needs_category} need category
@@ -573,7 +593,7 @@ export default function SourcesEnhanced() {
           setShowAccountSelection(false);
         }
       }}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className={isMobile ? "w-[calc(100vw-1.25rem)] max-w-[600px] p-4" : "max-w-[600px] p-6"}>
           <DialogHeader>
             <DialogTitle>
               Import Transactions
@@ -585,18 +605,18 @@ export default function SourcesEnhanced() {
 
           <div className="space-y-4">
             {/* Import Mode Selection */}
-            <div className="flex gap-2">
+            <div className={isMobile ? "grid grid-cols-1 gap-2" : "grid grid-cols-2 gap-2"}>
               <Button
                 variant={importMode === "sync" ? "default" : "outline"}
                 onClick={() => setImportMode("sync")}
-                className="flex-1"
+                className="w-full"
               >
                 Sync New
               </Button>
               <Button
                 variant={importMode === "date-range" ? "default" : "outline"}
                 onClick={() => setImportMode("date-range")}
-                className="flex-1"
+                className="w-full"
               >
                 Date Range
               </Button>
@@ -604,13 +624,13 @@ export default function SourcesEnhanced() {
 
             {/* Date Range Selection */}
             {importMode === "date-range" && (
-              <div className="flex gap-2">
+              <div className={isMobile ? "grid grid-cols-1 gap-2" : "grid grid-cols-2 gap-2"}>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
                       className={cn(
-                        "justify-start text-left font-normal flex-1",
+                        "w-full justify-start text-left font-normal",
                         !dateRange.from && "text-muted-foreground"
                       )}
                     >
@@ -633,7 +653,7 @@ export default function SourcesEnhanced() {
                     <Button
                       variant="outline"
                       className={cn(
-                        "justify-start text-left font-normal flex-1",
+                        "w-full justify-start text-left font-normal",
                         !dateRange.to && "text-muted-foreground"
                       )}
                     >
@@ -654,9 +674,10 @@ export default function SourcesEnhanced() {
             )}
 
             {/* Master Selection Controls */}
-            <div className="flex items-center justify-between p-3 rounded-lg border bg-muted/50">
+            <div className="rounded-lg border bg-muted/50 p-3">
+              <div className={isMobile ? "flex flex-col gap-2" : "flex items-center justify-between"}>
               <span className="text-sm font-medium">Select Accounts to Import</span>
-              <div className="flex gap-2">
+              <div className="grid grid-cols-2 gap-2">
                 <Button
                   variant="outline"
                   size="sm"
@@ -677,6 +698,7 @@ export default function SourcesEnhanced() {
                 >
                   Clear All
                 </Button>
+              </div>
               </div>
             </div>
 
@@ -751,8 +773,8 @@ export default function SourcesEnhanced() {
             </div>
           </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsImportModalOpen(false)}>
+          <DialogFooter className={isMobile ? "flex-col gap-2" : "flex-row"}>
+            <Button variant="outline" onClick={() => setIsImportModalOpen(false)} className={isMobile ? "w-full" : "w-auto"}>
               Cancel
             </Button>
             <Button 
@@ -840,6 +862,7 @@ export default function SourcesEnhanced() {
                 }
               }} 
               disabled={isLoading || selectedAccounts.length === 0}
+              className={isMobile ? "w-full" : "w-auto"}
             >
               {isLoading && <RefreshCw className="mr-2 h-4 w-4 animate-spin" />}
               Import Selected Accounts

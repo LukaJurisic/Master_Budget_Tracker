@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { apiClient } from '@/lib/api'
-import { formatCurrency, formatDate } from '@/lib/utils'
+import { formatCurrency } from '@/lib/utils'
+import { useIsMobile } from '@/hooks/useIsMobile'
 
 interface EditableIncomeRow {
   id?: number
@@ -36,6 +37,7 @@ export default function Income() {
   const [sourceToCategoryMap, setSourceToCategoryMap] = useState<Map<string, string>>(new Map())
   const [saveMessage, setSaveMessage] = useState<string>('')
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const isMobile = useIsMobile()
   
   // Track which rows have already spawned a new row to prevent multiple spawns
   const spawnedOnceRef = useRef<Set<string | number>>(new Set())
@@ -73,7 +75,7 @@ export default function Income() {
         new Date(b.posted_date).getTime() - new Date(a.posted_date).getTime()
       )
       
-      const rows = sortedTransactions.map(t => {
+      const rows: EditableIncomeRow[] = sortedTransactions.map(t => {
         const account = accounts?.find(a => a.id === t.account_id)
         return {
           id: t.id,
@@ -439,11 +441,11 @@ export default function Income() {
   const hasChanges = incomeRows.some(row => row.isEdited && !row.isNew && row.source && row.amount)
 
   return (
-    <div className="space-y-6">
+    <div className={isMobile ? 'space-y-4' : 'space-y-6'}>
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className={isMobile ? 'flex flex-col gap-3' : 'flex items-center justify-between'}>
         <div>
-          <h1 className="text-3xl font-bold">Income</h1>
+          <h1 className={isMobile ? 'text-2xl font-bold' : 'text-3xl font-bold'}>Income</h1>
           <p className="text-muted-foreground">
             Excel-style editable income tracker - new entries auto-create at top
           </p>
@@ -458,6 +460,7 @@ export default function Income() {
             variant="outline" 
             onClick={handleSaveChanges}
             disabled={!hasChanges || createIncomeMutation.isPending || updateIncomeMutation.isPending}
+            className={isMobile ? 'w-full' : 'w-auto'}
           >
             <Save className="mr-2 h-4 w-4" />
             {createIncomeMutation.isPending || updateIncomeMutation.isPending ? 'Saving...' : 'Save Changes'}
@@ -468,29 +471,29 @@ export default function Income() {
       {/* Toolbar */}
       <Card>
         <CardContent className="pt-6">
-          <div className="flex items-center space-x-4">
-            <div className="flex-1 flex items-center space-x-2">
+          <div className={isMobile ? 'flex flex-col gap-3' : 'flex items-center space-x-4'}>
+            <div className={isMobile ? 'grid grid-cols-1 gap-2' : 'flex flex-1 items-center space-x-2'}>
               <Input
                 type="date"
                 value={dateFrom}
                 onChange={(e) => setDateFrom(e.target.value)}
-                className="w-40"
+                className={isMobile ? 'w-full' : 'w-40'}
               />
-              <span>to</span>
+              {!isMobile && <span className="text-sm text-muted-foreground">to</span>}
               <Input
                 type="date"
                 value={dateTo}
                 onChange={(e) => setDateTo(e.target.value)}
-                className="w-40"
+                className={isMobile ? 'w-full' : 'w-40'}
               />
             </div>
             <Input
               placeholder="Search source..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-64"
+              className={isMobile ? 'w-full' : 'w-64'}
             />
-            <div className="flex items-center space-x-2">
+            <div className={isMobile ? 'flex flex-col items-start gap-2' : 'flex items-center space-x-2'}>
               <input
                 ref={fileInputRef}
                 type="file"
@@ -502,6 +505,7 @@ export default function Income() {
                 variant="outline" 
                 onClick={() => fileInputRef.current?.click()}
                 disabled={previewMutation.isPending || commitMutation.isPending}
+                className={isMobile ? 'w-full' : 'w-auto'}
               >
                 <Upload className="mr-2 h-4 w-4" />
                 {previewMutation.isPending ? 'Loading...' : 'Import Excel'}
@@ -519,7 +523,7 @@ export default function Income() {
       {/* Excel-style Income Table */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center justify-between">
+          <CardTitle className={isMobile ? 'flex flex-col gap-2' : 'flex items-center justify-between'}>
             <span>Income Transactions - Excel Style</span>
             <span className="text-sm font-normal text-muted-foreground">
               Click any cell to edit • Auto-saves when you navigate away
@@ -540,7 +544,134 @@ export default function Income() {
             </div>
           ) : (
             <>
-              <div className="border rounded-lg overflow-hidden">
+              {isMobile ? (
+                <div className="space-y-3">
+                  {incomeRows.map((row, index) => (
+                    <div
+                      key={row.id || index}
+                      className={`rounded-lg border p-3 ${
+                        row.isNew ? 'bg-green-50' : row.isEdited ? 'bg-yellow-50' : 'bg-white'
+                      }`}
+                    >
+                      <div className="grid grid-cols-1 gap-3">
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="mb-1 block text-xs font-medium text-muted-foreground">Date</label>
+                            <Input
+                              type="date"
+                              value={row.posted_date}
+                              onChange={(e) => handleCellChange(index, 'posted_date', e.target.value)}
+                              onBlur={() => handleCommitRow(index)}
+                              onKeyDown={(e) => e.key === 'Enter' && handleCommitRow(index)}
+                              className="h-9 text-sm"
+                            />
+                          </div>
+                          <div>
+                            <label className="mb-1 block text-xs font-medium text-muted-foreground">Amount</label>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              value={row.amount}
+                              onChange={(e) => handleCellChange(index, 'amount', e.target.value)}
+                              onBlur={() => handleCommitRow(index)}
+                              onKeyDown={(e) => e.key === 'Enter' && handleCommitRow(index)}
+                              placeholder="0.00"
+                              className="h-9 text-sm"
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="mb-1 block text-xs font-medium text-muted-foreground">Source</label>
+                          <Input
+                            value={row.source}
+                            onChange={(e) => handleCellChange(index, 'source', e.target.value)}
+                            onBlur={() => handleCommitRow(index)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleCommitRow(index)}
+                            placeholder="Employer, Client..."
+                            className="h-9 text-sm"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="mb-1 block text-xs font-medium text-muted-foreground">Income Category</label>
+                          <input
+                            type="text"
+                            list={`income-categories-mobile-${index}`}
+                            value={row.income_category}
+                            onChange={(e) => handleCellChange(index, 'income_category', e.target.value)}
+                            onBlur={() => handleCommitRow(index)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleCommitRow(index)}
+                            placeholder="Primary Job, Bonus..."
+                            className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none"
+                          />
+                          <datalist id={`income-categories-mobile-${index}`}>
+                            {Array.from(incomeCategories).map(cat => (
+                              <option key={cat} value={cat} />
+                            ))}
+                            <option value="Primary Job" />
+                            <option value="Primary Job - Bonus" />
+                            <option value="Family Income" />
+                            <option value="Government" />
+                            <option value="Tax Refund" />
+                            <option value="Interest" />
+                            <option value="Insurance" />
+                            <option value="Investment Income" />
+                            <option value="Other Income" />
+                          </datalist>
+                        </div>
+
+                        <div>
+                          <label className="mb-1 block text-xs font-medium text-muted-foreground">Account</label>
+                          <select
+                            value={row.account_id || ''}
+                            onChange={(e) => {
+                              const selectedAccount = accounts?.find(a => a.id === parseInt(e.target.value))
+                              handleCellChange(index, 'account_id', e.target.value)
+                              handleCellChange(index, 'account_name', selectedAccount ? `${selectedAccount.name}${selectedAccount.mask ? ` ••••${selectedAccount.mask}` : ''}` : '')
+                            }}
+                            onBlur={() => handleCommitRow(index)}
+                            className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none"
+                          >
+                            <option value="">Select account...</option>
+                            {accounts?.map(account => (
+                              <option key={account.id} value={account.id}>
+                                {account.name} {account.mask && `••••${account.mask}`}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="mb-1 block text-xs font-medium text-muted-foreground">Notes</label>
+                          <Input
+                            value={row.notes}
+                            onChange={(e) => handleCellChange(index, 'notes', e.target.value)}
+                            onBlur={() => handleCommitRow(index)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleCommitRow(index)}
+                            placeholder="Optional notes..."
+                            className="h-9 text-sm"
+                          />
+                        </div>
+                      </div>
+
+                      {!row.isNew && (
+                        <div className="mt-3 flex justify-end">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleDeleteRow(index, row.id)}
+                            disabled={deleteIncomeMutation.isPending}
+                          >
+                            <Trash2 className="h-4 w-4 text-red-500" />
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="overflow-x-auto rounded-lg border">
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-gray-50">
@@ -667,6 +798,7 @@ export default function Income() {
                   </TableBody>
                 </Table>
               </div>
+              )}
               
               {/* Total Row */}
               <div className="mt-4 pt-4 border-t flex justify-between items-center">
@@ -685,7 +817,7 @@ export default function Income() {
       {/* Sheet Picker Dialog */}
       {showSheetPicker && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg w-[600px] max-h-[80vh] overflow-y-auto">
+          <div className={isMobile ? "bg-white p-4 rounded-lg w-[calc(100vw-1.25rem)] max-h-[80vh] overflow-y-auto" : "bg-white p-6 rounded-lg w-[600px] max-h-[80vh] overflow-y-auto"}>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold">Select sheets to import</h3>
               <Button
@@ -697,7 +829,7 @@ export default function Income() {
               </Button>
             </div>
             
-            <div className="grid grid-cols-2 gap-6">
+            <div className={isMobile ? "grid grid-cols-1 gap-4" : "grid grid-cols-2 gap-6"}>
               <div>
                 <h4 className="font-medium mb-3 text-blue-700">Expense Sheets</h4>
                 <div className="space-y-2">
@@ -733,16 +865,18 @@ export default function Income() {
               </div>
             </div>
             
-            <div className="mt-6 flex justify-end space-x-3">
+            <div className={isMobile ? "mt-6 flex flex-col-reverse gap-2" : "mt-6 flex justify-end space-x-3"}>
               <Button
                 variant="outline"
                 onClick={() => setShowSheetPicker(false)}
+                className={isMobile ? "w-full" : "w-auto"}
               >
                 Cancel
               </Button>
               <Button
                 onClick={handleConfirmImport}
                 disabled={commitMutation.isPending || (expenseSheets.length === 0 && incomeSheets.length === 0)}
+                className={isMobile ? "w-full" : "w-auto"}
               >
                 {commitMutation.isPending ? 'Importing...' : `Import ${expenseSheets.length + incomeSheets.length} sheets`}
               </Button>

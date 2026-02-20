@@ -8,6 +8,7 @@ import AccountsTable from '@/components/balances/AccountsTable'
 import NetWorthCard from '@/components/dashboard/NetWorthCard'
 import NDAXConnectModal from '@/components/integrations/NDAXConnectModal'
 import AccountRefreshModal from '@/components/balances/AccountRefreshModal'
+import { useIsMobile } from '@/hooks/useIsMobile'
 
 interface BalancesData {
   accounts: Array<{
@@ -42,6 +43,7 @@ export default function BalancesPage() {
   const [ndaxRefreshing, setNdaxRefreshing] = useState(false)
   const [refreshModalOpen, setRefreshModalOpen] = useState(false)
   const { toast } = useToast()
+  const isMobile = useIsMobile()
 
   const loadBalances = async () => {
     try {
@@ -206,15 +208,16 @@ export default function BalancesPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className={isMobile ? 'space-y-4' : 'space-y-6'}>
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Account Balances</h1>
-        <div className="flex gap-2">
+      <div className={isMobile ? 'flex flex-col gap-3' : 'flex items-center justify-between'}>
+        <h1 className={isMobile ? 'text-2xl font-bold' : 'text-3xl font-bold'}>Account Balances</h1>
+        <div className={isMobile ? 'grid grid-cols-1 gap-2' : 'grid grid-cols-2 gap-2'}>
           <Button
             onClick={() => setNdaxModalOpen(true)}
             size="sm"
             variant="outline"
+            className="w-full"
           >
             <Plus className="mr-2 h-4 w-4" />
             Connect Exchange
@@ -223,6 +226,7 @@ export default function BalancesPage() {
             onClick={() => setRefreshModalOpen(true)}
             disabled={refreshing}
             size="sm"
+            className="w-full"
           >
             {refreshing ? (
               <>
@@ -260,14 +264,18 @@ export default function BalancesPage() {
           <BalanceSummary totals={data.totals} lastUpdated={data.timestamp} />
 
           {/* Additional Cards Row */}
-          <div className="grid gap-6 md:grid-cols-4">
-            <div className="md:col-span-3">
-              {/* This space can be used for additional metrics later */}
+          {isMobile ? (
+            <NetWorthCard />
+          ) : (
+            <div className="grid gap-6 md:grid-cols-4">
+              <div className="md:col-span-3">
+                {/* This space can be used for additional metrics later */}
+              </div>
+              <div className="md:col-span-1">
+                <NetWorthCard />
+              </div>
             </div>
-            <div className="md:col-span-1">
-              <NetWorthCard />
-            </div>
-          </div>
+          )}
 
           {/* Accounts Table */}
           <Card>
@@ -282,7 +290,7 @@ export default function BalancesPage() {
           {/* NDAX Balances Section */}
           {ndaxData && ndaxData.balances && ndaxData.balances.length > 0 && (
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardHeader className={isMobile ? 'space-y-3 pb-2' : 'space-y-0 pb-2 sm:flex sm:flex-row sm:items-center sm:justify-between'}>
                 <div>
                   <CardTitle className="flex items-center gap-2">
                     <Bitcoin className="h-5 w-5" />
@@ -297,6 +305,7 @@ export default function BalancesPage() {
                   disabled={ndaxRefreshing}
                   size="sm"
                   variant="outline"
+                  className={isMobile ? 'w-full' : 'w-auto'}
                 >
                   {ndaxRefreshing ? (
                     <>
@@ -324,33 +333,59 @@ export default function BalancesPage() {
                   </div>
 
                   {/* NDAX Assets Table */}
-                  <div className="rounded-md border">
-                    <table className="w-full">
-                      <thead>
-                        <tr className="border-b">
-                          <th className="text-left p-3">Asset</th>
-                          <th className="text-right p-3">Available</th>
-                          <th className="text-right p-3">Total</th>
-                          <th className="text-right p-3">Value (CAD)</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {ndaxData.balances.map((balance: any, index: number) => (
-                          <tr key={index} className="border-b">
-                            <td className="p-3 font-medium">{balance.currency || balance.name}</td>
-                            <td className="text-right p-3">{balance.available?.toFixed(8) || '0'}</td>
-                            <td className="text-right p-3">{balance.total?.toFixed(8) || '0'}</td>
-                            <td className="text-right p-3">
-                              {balance.value_cad ? 
-                                `$${balance.value_cad.toLocaleString('en-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` 
-                                : '-'
-                              }
-                            </td>
+                  {isMobile ? (
+                    <div className="space-y-2">
+                      {ndaxData.balances.map((balance: any, index: number) => (
+                        <div key={index} className="rounded-md border bg-white p-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="font-medium">{balance.currency || balance.name}</p>
+                            <p className="text-sm font-semibold">
+                              {balance.value_cad
+                                ? `$${balance.value_cad.toLocaleString('en-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                                : '-'}
+                            </p>
+                          </div>
+                          <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+                            <div>
+                              <p>Available</p>
+                              <p className="font-medium text-foreground">{balance.available?.toFixed(8) || '0'}</p>
+                            </div>
+                            <div>
+                              <p>Total</p>
+                              <p className="font-medium text-foreground">{balance.total?.toFixed(8) || '0'}</p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="rounded-md border">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b">
+                            <th className="text-left p-3">Asset</th>
+                            <th className="text-right p-3">Available</th>
+                            <th className="text-right p-3">Total</th>
+                            <th className="text-right p-3">Value (CAD)</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                        </thead>
+                        <tbody>
+                          {ndaxData.balances.map((balance: any, index: number) => (
+                            <tr key={index} className="border-b">
+                              <td className="p-3 font-medium">{balance.currency || balance.name}</td>
+                              <td className="text-right p-3">{balance.available?.toFixed(8) || '0'}</td>
+                              <td className="text-right p-3">{balance.total?.toFixed(8) || '0'}</td>
+                              <td className="text-right p-3">
+                                {balance.value_cad
+                                  ? `$${balance.value_cad.toLocaleString('en-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                                  : '-'}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>

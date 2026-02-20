@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { ArrowUpDown, Building2, CreditCard } from 'lucide-react'
 import { Button } from '../ui/button'
 import { Badge } from '../ui/badge'
+import { useIsMobile } from '@/hooks/useIsMobile'
 import {
   Table,
   TableBody,
@@ -33,8 +34,9 @@ interface AccountsTableProps {
 export default function AccountsTable({ accounts }: AccountsTableProps) {
   const [sortField, setSortField] = useState<keyof Account>('name')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
+  const isMobile = useIsMobile()
 
-  const formatCurrency = (amount: number | null, currency = 'CAD') => {
+  const formatCurrency = (amount: number | null | undefined, currency = 'CAD') => {
     if (amount === null || amount === undefined) return '-'
     return new Intl.NumberFormat('en-CA', {
       style: 'currency',
@@ -95,6 +97,91 @@ export default function AccountsTable({ accounts }: AccountsTableProps) {
         <p className="mt-1 text-sm text-gray-500">
           Connect your bank accounts to see balances here.
         </p>
+      </div>
+    )
+  }
+
+  if (isMobile) {
+    return (
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/30 p-2">
+          <span className="text-xs font-medium text-muted-foreground">Sort:</span>
+          <Button
+            size="sm"
+            variant={sortField === 'name' ? 'default' : 'outline'}
+            onClick={() => handleSort('name')}
+            className="h-8"
+          >
+            Name
+          </Button>
+          <Button
+            size="sm"
+            variant={sortField === 'current' ? 'default' : 'outline'}
+            onClick={() => handleSort('current')}
+            className="h-8"
+          >
+            Balance
+          </Button>
+          <Button
+            size="sm"
+            variant={sortField === 'last_updated' ? 'default' : 'outline'}
+            onClick={() => handleSort('last_updated')}
+            className="h-8"
+          >
+            Updated
+          </Button>
+          <span className="text-xs text-muted-foreground">
+            {sortDirection === 'asc' ? 'Asc' : 'Desc'}
+          </span>
+        </div>
+
+        {sortedAccounts.map((account) => (
+          <div key={account.id} className="rounded-lg border bg-white p-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  {getAccountIcon(account.type, account.subtype)}
+                  <p className="truncate font-semibold">{account.name}</p>
+                </div>
+                {account.official_name && account.official_name !== account.name && (
+                  <p className="mt-0.5 truncate text-xs text-muted-foreground">{account.official_name}</p>
+                )}
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  {account.institution || 'Unknown'}
+                  {account.mask ? ` •••• ${account.mask}` : ''}
+                </p>
+              </div>
+              <Badge className={getTypeColor(account.type)}>{account.type}</Badge>
+            </div>
+
+            <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+              <div className="rounded-md bg-muted/40 p-2">
+                <p className="text-[11px] text-muted-foreground">Current</p>
+                <p className="font-semibold">{formatCurrency(account.current, account.currency)}</p>
+              </div>
+              <div className="rounded-md bg-muted/40 p-2">
+                <p className="text-[11px] text-muted-foreground">Available</p>
+                <p className="font-semibold">{formatCurrency(account.available, account.currency)}</p>
+              </div>
+              <div className="rounded-md bg-muted/40 p-2">
+                <p className="text-[11px] text-muted-foreground">Limit</p>
+                <p className="font-semibold">
+                  {account.limit ? formatCurrency(account.limit, account.currency) : '-'}
+                </p>
+              </div>
+              <div className="rounded-md bg-muted/40 p-2">
+                <p className="text-[11px] text-muted-foreground">Updated</p>
+                <p className="font-semibold">{formatDate(account.last_updated)}</p>
+              </div>
+            </div>
+
+            {account.subtype && (
+              <p className="mt-2 text-xs capitalize text-muted-foreground">
+                {account.subtype.replace('_', ' ')}
+              </p>
+            )}
+          </div>
+        ))}
       </div>
     )
   }
