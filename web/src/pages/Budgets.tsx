@@ -180,21 +180,21 @@ export default function Budgets() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Budgets</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold">Budgets</h1>
           <p className="text-muted-foreground">
             Set and track monthly spending targets by category
           </p>
         </div>
-        <div className="flex items-center space-x-4">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
           <input
             type="month"
             value={selectedMonth}
             onChange={(e) => setSelectedMonth(e.target.value)}
-            className="px-3 py-2 border rounded-lg"
+            className="px-3 py-2 border rounded-lg w-full sm:w-auto"
           />
-          <Button onClick={handleCreateBudget}>
+          <Button onClick={handleCreateBudget} className="w-full sm:w-auto">
             <Plus className="mr-2 h-4 w-4" />
             New Budget
           </Button>
@@ -257,12 +257,12 @@ export default function Budgets() {
           </p>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center space-x-4">
-            <Button variant="outline">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:space-x-4">
+            <Button variant="outline" className="w-full sm:w-auto">
               <Upload className="mr-2 h-4 w-4" />
               Import from Excel
             </Button>
-            <Button variant="outline">
+            <Button variant="outline" className="w-full sm:w-auto">
               Export to Excel
             </Button>
           </div>
@@ -290,18 +290,19 @@ export default function Budgets() {
               ))}
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Category</TableHead>
-                  <TableHead>Budget</TableHead>
-                  <TableHead>Actual</TableHead>
-                  <TableHead>Variance</TableHead>
-                  <TableHead>Progress</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+            <div className="overflow-x-auto">
+              <Table className="min-w-[860px]">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Category</TableHead>
+                    <TableHead>Budget</TableHead>
+                    <TableHead>Actual</TableHead>
+                    <TableHead>Variance</TableHead>
+                    <TableHead>Progress</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
                 {budgetVsActual?.budget_items?.map((item) => (
                   <TableRow key={item.category.id}>
                     <TableCell>
@@ -420,8 +421,9 @@ export default function Budgets() {
                     </TableCell>
                   </TableRow>
                 ))}
-              </TableBody>
-            </Table>
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>

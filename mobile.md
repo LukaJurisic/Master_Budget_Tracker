@@ -78,7 +78,38 @@
   - Created `mobile` branch.
   - Added `mobile.md`.
   - Linked workflow to local `app_store_cheat_sheet` repo.
+  - Installed Capacitor packages in `web`:
+    - `@capacitor/core`
+    - `@capacitor/ios`
+    - `@capacitor/cli`
+  - Initialized Capacitor:
+    - App name: `Budget Tracker`
+    - App ID: `com.lukajurisic.budgettracker`
+    - Web dir: `dist`
+  - Added iOS platform scaffold at `web/ios`.
+  - Added mobile scripts in `web/package.json`:
+    - `build:mobile`
+    - `build:mobile:quick`
+    - `cap:sync`
+    - `cap:copy`
+    - `cap:open:ios`
+    - `cap:run:ios`
+  - Applied mobile UX optimization while keeping desktop behavior:
+    - Bottom tab bar on mobile in `web/src/App.tsx`
+    - Sticky top header + safe area spacing
+    - Better small-screen spacing and controls in dashboard/budgets/transactions
+    - Horizontal-safe tables for dense data screens
+    - Removed dead state in transactions to keep strict TypeScript builds clean
+  - Verified mobile asset pipeline:
+    - `npm run build:mobile:quick` works and syncs to iOS shell.
+  - Known blocker:
+    - `npm run build` currently fails due pre-existing TypeScript issues across unrelated files.
+    - Use `build:mobile:quick` while we address type cleanup in parallel.
 
 ## Next Milestone
-- Initialize iOS shell with Capacitor and boot current web app in simulator.
-- Define the first "monthly ritual" mobile flow end-to-end.
+- Build and sync web assets:
+  - `cd web`
+  - `npm run build:mobile`
+- Open in Xcode on Mac:
+  - `npm run cap:open:ios`
+- Define and test the first "monthly ritual" flow end-to-end on iPhone simulator.

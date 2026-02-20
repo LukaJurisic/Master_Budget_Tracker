@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { DollarSign, TrendingUp, TrendingDown, Calendar, AlertTriangle, PieChart as PieChartIcon } from 'lucide-react'
+import { DollarSign, TrendingUp, Calendar, AlertTriangle, PieChart as PieChartIcon } from 'lucide-react'
 import { formatCurrency } from '@/lib/formatters'
 import { DashboardCards } from '@/lib/api'
 
@@ -8,11 +8,10 @@ interface CardsRowProps {
 }
 
 export function CardsRow({ cards }: CardsRowProps) {
-  const netSavingsIcon = cards.net_savings >= 0 ? TrendingUp : TrendingDown
   const netSavingsColor = cards.net_savings >= 0 ? 'text-green-600' : 'text-red-600'
   
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-6">
+    <div className="grid grid-cols-2 gap-3 md:gap-4 md:grid-cols-3 xl:grid-cols-6">
       {/* Income */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">

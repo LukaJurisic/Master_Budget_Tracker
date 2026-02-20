@@ -11,13 +11,12 @@ function useDebounced<T>(value: T, delay = 250) {
   }, [value, delay]);
   return v;
 }
-import { Search, Filter, Download, Upload, ChevronLeft, ChevronRight, X, Trash2, Save } from 'lucide-react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Search, Filter, Download, ChevronLeft, ChevronRight, X } from 'lucide-react'
+import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useToast } from '@/components/ui/use-toast'
-import { apiClient } from '@/lib/api'
 import { formatAmount, formatDate } from '@/lib/utils'
 
 type Filters = {
@@ -169,7 +168,6 @@ export default function Transactions() {
   const [search, setSearch] = React.useState(filters.q || "");
   const debouncedSearch = useDebounced(search, 300); // Balanced delay for responsiveness
   const inputRef = React.useRef<HTMLInputElement>(null);
-  const [isSearching, setIsSearching] = React.useState(false);
   const cursorPosRef = React.useRef<number>(0);
   
   // 3) Filter panel state
@@ -177,8 +175,6 @@ export default function Transactions() {
   const [amountMin, setAmountMin] = React.useState<string>(filters.amountMin?.toString() || "");
   const [amountMax, setAmountMax] = React.useState<string>(filters.amountMax?.toString() || "");
   const [cleanedMerchant, setCleanedMerchant] = React.useState<string>(filters.cleanedMerchant || "");
-  const [selectedSource, setSelectedSource] = React.useState<string>("");
-  const [showOnlyUnmapped, setShowOnlyUnmapped] = React.useState(false);
   
   // Apply filters with debouncing
   const debouncedAmountMin = useDebounced(amountMin, 500);
@@ -369,7 +365,6 @@ export default function Transactions() {
 
   const handleSearch = (q: string) => {
     setSearch(q); // Update local search state immediately (no debouncing for input display)
-    setIsSearching(q.length > 0);
     // Save cursor position
     if (inputRef.current) {
       cursorPosRef.current = inputRef.current.selectionStart || 0;
@@ -506,11 +501,11 @@ export default function Transactions() {
   const categories = catsQuery.data || [];
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Transactions</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold">Transactions</h1>
           <p className="text-gray-600 mt-1">
             {total.toLocaleString()} transactions found
           </p>
@@ -536,7 +531,7 @@ export default function Transactions() {
               toast({ title: "Error", description: error.message, variant: "destructive" });
             }
           }}
-          className="flex items-center gap-2"
+          className="flex items-center justify-center gap-2 w-full sm:w-auto"
         >
           <Download className="h-4 w-4" />
           Export to Excel
@@ -546,14 +541,14 @@ export default function Transactions() {
       {/* Filters */}
       <Card>
         <CardContent className="p-4">
-          <div className="flex flex-wrap gap-4 items-center">
+          <div className="flex flex-col gap-4">
             {/* Transaction Type Toggle */}
-            <div className="flex rounded-md border">
+            <div className="flex rounded-md border w-full sm:w-fit overflow-hidden">
               {(["expense", "income", "all"] as const).map((type) => (
                 <button
                   key={type}
                   onClick={() => handleTxnTypeChange(type)}
-                  className={`px-4 py-2 text-sm font-medium capitalize ${
+                  className={`flex-1 sm:flex-none px-4 py-2 text-sm font-medium capitalize ${
                     filters.txnType === type
                       ? "bg-blue-500 text-white"
                       : "bg-white text-gray-700 hover:bg-gray-50"
@@ -565,7 +560,7 @@ export default function Transactions() {
             </div>
 
             {/* Search */}
-            <div className="relative flex-1 max-w-md">
+            <div className="relative w-full">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
               <Input
                 ref={inputRef}
@@ -593,19 +588,19 @@ export default function Transactions() {
             </div>
 
             {/* Date Range */}
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row gap-2">
               <Input
                 type="date"
                 value={filters.dateFrom || ""}
                 onChange={(e) => updateFilters({ dateFrom: e.target.value || undefined })}
-                className="w-40"
+                className="w-full sm:w-44"
               />
-              <span className="flex items-center text-gray-500">to</span>
+              <span className="hidden sm:flex items-center text-gray-500">to</span>
               <Input
                 type="date"
                 value={filters.dateTo || ""}
                 onChange={(e) => updateFilters({ dateTo: e.target.value || undefined })}
-                className="w-40"
+                className="w-full sm:w-44"
               />
               
               {/* Filter Button */}
@@ -613,7 +608,7 @@ export default function Transactions() {
                 variant="outline"
                 size="default"
                 onClick={() => setShowFilters(!showFilters)}
-                className="flex items-center gap-2"
+                className="flex items-center justify-center gap-2 w-full sm:w-auto"
               >
                 <Filter className="h-4 w-4" />
                 Filters
@@ -761,8 +756,6 @@ export default function Transactions() {
                     setAmountMin("");
                     setAmountMax("");
                     setCleanedMerchant("");
-                    setSelectedSource("");
-                    setShowOnlyUnmapped(false);
                   }}
                   className="w-full"
                 >
@@ -778,7 +771,7 @@ export default function Transactions() {
       <Card>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
-            <Table>
+            <Table className="min-w-[980px]">
               <TableHeader>
                 <TableRow>
                   <TableHead>Date</TableHead>
@@ -845,7 +838,7 @@ export default function Transactions() {
       {pages > 1 && (
         <Card>
           <CardContent className="p-4">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="text-sm text-gray-600">
                 Page {filters.page} of {pages} ({total.toLocaleString()} total)
               </div>
@@ -877,7 +870,7 @@ export default function Transactions() {
       {/* Bulk Update Confirmation Dialog */}
       {bulkUpdateDialog.show && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-lg p-4 sm:p-6 max-w-4xl w-full mx-3 sm:mx-4 max-h-[90vh] overflow-y-auto">
             <h3 className="text-lg font-semibold mb-4">Update Similar Transactions?</h3>
             <p className="text-gray-600 mb-4">
               Found <span className="font-bold">{bulkUpdateDialog.similarCount}</span> other transactions 

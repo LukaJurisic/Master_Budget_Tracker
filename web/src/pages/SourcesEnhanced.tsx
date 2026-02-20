@@ -426,11 +426,6 @@ export default function SourcesEnhanced() {
         <PlaidLinkComponent token={linkToken} onSuccess={handleSuccess} onExit={() => setLinkToken(null)} />
       ) : null}
 
-      {/* Debug info */}
-      <div className="text-xs text-muted-foreground">
-        Debug: linkToken = {linkToken ? 'SET' : 'NULL'}, updateLinkToken = {updateLinkToken ? 'SET' : 'NULL'}, isGettingToken = {isGettingToken.toString()}
-      </div>
-
       {/* Connected Accounts */}
       <div className="space-y-4">
         {Object.entries(accountsByInstitution).map(([itemId, institution]) => (
@@ -532,7 +527,7 @@ export default function SourcesEnhanced() {
                 <div
                   key={imp.id}
                   className="flex items-center justify-between p-3 rounded-lg border hover:bg-accent cursor-pointer"
-                  onClick={() => window.location.href = `/mapping-studio?import=${imp.id}&tab=staging`}
+                  onClick={() => window.location.href = `/mapping?tab=staging&importId=${encodeURIComponent(imp.id)}`}
                 >
                   <div>
                     <p className="font-medium">

@@ -11,7 +11,8 @@ import {
   X,
   TrendingUp,
   BarChart3,
-  Wallet
+  Wallet,
+  MoreHorizontal
 } from 'lucide-react'
 
 // Pages
@@ -27,7 +28,6 @@ import BalancesPage from './pages/BalancesPage'
 
 // Components
 import { Button } from './components/ui/button'
-import { Card } from './components/ui/card'
 import { Toaster } from './components/ui/toaster'
 import { DemoModeBanner } from './components/DemoModeBanner'
 import { AppModeProvider } from './contexts/AppModeContext'
@@ -44,14 +44,29 @@ const navigation = [
   { name: 'Debug', href: '/debug', icon: Settings },
 ]
 
+const mobileNavigation = [
+  { name: 'Home', href: '/', icon: LayoutDashboard },
+  { name: 'Txns', href: '/transactions', icon: CreditCard },
+  { name: 'Map', href: '/mapping', icon: Settings },
+  { name: 'Budgets', href: '/budgets', icon: Target },
+  { name: 'More', href: '/sources', icon: MoreHorizontal },
+]
+
+function isActiveRoute(pathname: string, href: string) {
+  if (href === '/') return pathname === '/'
+  return pathname === href || pathname.startsWith(`${href}/`)
+}
+
 function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const location = useLocation()
+  const currentPageName =
+    navigation.find((item) => isActiveRoute(location.pathname, item.href))?.name || 'Budget Tracker'
 
   return (
     <AppModeProvider>
       <DemoModeBanner />
-      <div className="flex h-screen bg-gray-50">
+      <div className="safe-area-top flex h-[100dvh] bg-gray-50">
       {/* Mobile sidebar overlay */}
       {sidebarOpen && (
         <div
@@ -83,7 +98,7 @@ function App() {
 
         <nav className="mt-6 px-3">
           {navigation.map((item) => {
-            const isActive = location.pathname === item.href
+            const isActive = isActiveRoute(location.pathname, item.href)
             return (
               <Link
                 key={item.name}
@@ -112,8 +127,8 @@ function App() {
       {/* Main content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Top bar */}
-        <header className="bg-white shadow-sm border-b">
-          <div className="px-6 py-4 flex items-center justify-between">
+        <header className="sticky top-0 z-30 bg-white shadow-sm border-b">
+          <div className="px-4 sm:px-6 py-3 lg:py-4 flex items-center justify-between">
             <Button
               variant="ghost"
               size="icon"
@@ -123,20 +138,18 @@ function App() {
               <Menu className="h-6 w-6" />
             </Button>
 
-            <div className="flex-1 lg:flex lg:items-center lg:justify-between">
-              <div className="hidden lg:block">
-                <h2 className="text-lg font-semibold text-gray-900">
-                  {navigation.find(item => item.href === location.pathname)?.name || 'Budget Tracker'}
-                </h2>
-              </div>
+            <div className="flex-1 px-2 lg:px-0 lg:flex lg:items-center lg:justify-between">
+              <h2 className="text-base lg:text-lg font-semibold text-gray-900">
+                {currentPageName}
+              </h2>
             </div>
           </div>
         </header>
 
         {/* Page content */}
-        <main className="flex-1 overflow-y-auto">
-          <div className="py-6">
-            <div className="max-w-7xl mx-auto px-6">
+        <main className="flex-1 overflow-y-auto pb-24 lg:pb-0">
+          <div className="py-4 lg:py-6">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6">
               <Routes>
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/analytics" element={<AnalyticsDashboard />} />
@@ -152,6 +165,29 @@ function App() {
             </div>
           </div>
         </main>
+
+        {/* Mobile bottom navigation */}
+        <nav className="safe-area-bottom fixed bottom-0 left-0 right-0 z-40 border-t bg-white/95 backdrop-blur lg:hidden">
+          <div className="grid grid-cols-5">
+            {mobileNavigation.map((item) => {
+              const isActive = isActiveRoute(location.pathname, item.href)
+              return (
+                <Link
+                  key={item.name}
+                  to={item.href}
+                  className={cn(
+                    "flex flex-col items-center justify-center py-2 text-[11px] font-medium",
+                    isActive ? "text-primary" : "text-gray-500"
+                  )}
+                  onClick={() => setSidebarOpen(false)}
+                >
+                  <item.icon className="h-5 w-5 mb-1" />
+                  {item.name}
+                </Link>
+              )
+            })}
+          </div>
+        </nav>
       </div>
       <Toaster />
     </div>

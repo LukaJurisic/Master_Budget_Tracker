@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { RefreshCw, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { apiClient } from '@/lib/api'
-import { formatMonthLong, getCurrentMonth, isAfterCurrentMonth } from '@/lib/formatters'
+import { formatMonthLong, getCurrentMonth } from '@/lib/formatters'
 
 // Dashboard components
 import { CardsRow } from '@/components/dashboard/CardsRow'
@@ -81,7 +81,7 @@ export default function Dashboard() {
   if (isLoading) {
     return (
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="text-3xl font-bold">Dashboard</h1>
           <Button disabled>
             <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
@@ -102,22 +102,22 @@ export default function Dashboard() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Dashboard</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold">Dashboard</h1>
           <p className="text-muted-foreground">
             Financial overview for {formatMonthLong(effectiveMonth || selectedMonth)}
           </p>
         </div>
-        <div className="flex items-center space-x-4">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
           <input
             type="month"
             value={selectedMonth}
             onChange={(e) => setSelectedMonth(e.target.value)}
             max={meta?.latest_data_month || getCurrentMonth()}
-            className="px-3 py-2 border rounded-lg"
+            className="px-3 py-2 border rounded-lg w-full sm:w-auto"
           />
-          <Button onClick={handleRefresh} disabled={isRefreshing}>
+          <Button onClick={handleRefresh} disabled={isRefreshing} className="w-full sm:w-auto">
             <RefreshCw className={`mr-2 h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
             Refresh Data
           </Button>
