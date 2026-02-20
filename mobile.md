@@ -117,16 +117,38 @@
   - Added Android bug-capture script at repo root:
     - `capture-bug.ps1`
     - Produces timestamped bundle with screenshot, UI tree, full logcat, app logcat, and metadata.
+  - Emulator blank-screen debugging completed:
+    - Fixed native API base handling with `web/src/lib/runtime.ts`.
+    - Wired Axios base URL to runtime resolver in `web/src/lib/api.ts`.
+    - Added native fetch URL rewriting in `web/src/main.tsx` for raw `fetch('/api/...')` calls.
+    - Added Android cleartext allowance in `web/android/app/src/main/AndroidManifest.xml`.
+    - Added Android HTTP scheme (`androidScheme: 'http'`) in `web/capacitor.config.ts` to avoid mixed-content blocking.
+    - Hardened dashboard rendering guards to avoid crash on malformed responses.
+    - Removed stale `/vite.svg` favicon reference to stop repeated asset errors in native logs.
+  - Local machine note:
+    - Port `8000` was occupied by another local uvicorn app (`Nautilus`), which caused wrong API responses.
+    - For this machine/emulator session, backend was started on `8010`.
+    - Android build was generated with:
+      - PowerShell: `$env:VITE_API_URL='http://10.0.2.2:8010'; npm run build:android:quick`
+    - Verified working state in emulator:
+      - Dashboard fully renders with cards/charts.
+      - Fallback banner for latest available month appears correctly.
 
 ## Next Milestone
 - Android emulator loop (Windows):
   - `cd web`
-  - `npm run build:android:quick`
+  - If backend runs on `8000`:
+    - `npm run build:android:quick`
+  - If backend runs on `8010` (port conflict workaround):
+    - PowerShell: `$env:VITE_API_URL='http://10.0.2.2:8010'; npm run build:android:quick`
   - `npm run cap:open:android`
   - Run on emulator from Android Studio
 - Direct deploy path (Windows terminal):
   - `cd web/android`
   - `./gradlew.bat installDebug`
+- Backend start (Windows terminal):
+  - `cd budget-tracker`
+  - `.\.venv\Scripts\python.exe -m uvicorn bt_app.main:app --reload --port 8010`
 - Fast bug capture (Windows terminal):
   - `.\capture-bug.ps1 -Label "short-description"`
   - Output goes to `artifacts\mobile-bugs\<timestamp>-<label>`

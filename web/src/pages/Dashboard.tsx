@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { RefreshCw, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { apiClient } from '@/lib/api'
+import { apiClient, DashboardCards, DashboardLines, DashboardCategories, DashboardTopMerchant } from '@/lib/api'
 import { formatMonthLong, getCurrentMonth } from '@/lib/formatters'
 
 // Dashboard components
@@ -14,6 +14,43 @@ import { CategoryDoughnut } from '@/components/dashboard/CategoryDoughnut'
 import { TopCategoriesBar } from '@/components/dashboard/TopCategoriesBar'
 import { CategoryDetailsList } from '@/components/dashboard/CategoryDetailsList'
 import { TopMerchants } from '@/components/dashboard/TopMerchants'
+
+function isDashboardCards(value: unknown): value is DashboardCards {
+  if (!value || typeof value !== 'object') return false
+  const v = value as Record<string, unknown>
+  return (
+    typeof v.income === 'number' &&
+    typeof v.expenses === 'number' &&
+    typeof v.net_savings === 'number' &&
+    typeof v.total_txns === 'number' &&
+    typeof v.unmapped === 'number' &&
+    typeof v.active_categories === 'number'
+  )
+}
+
+function isDashboardLines(value: unknown): value is DashboardLines {
+  if (!value || typeof value !== 'object') return false
+  const v = value as Record<string, unknown>
+  return (
+    Array.isArray(v.income_by_month) &&
+    Array.isArray(v.expenses_by_month) &&
+    Array.isArray(v.networth_cumulative)
+  )
+}
+
+function isDashboardCategories(value: unknown): value is DashboardCategories {
+  if (!value || typeof value !== 'object') return false
+  const v = value as Record<string, unknown>
+  return (
+    Array.isArray(v.breakdown) &&
+    Array.isArray(v.top_categories) &&
+    Array.isArray(v.category_details)
+  )
+}
+
+function isDashboardTopMerchants(value: unknown): value is DashboardTopMerchant[] {
+  return Array.isArray(value)
+}
 
 export default function Dashboard() {
   const [selectedMonth, setSelectedMonth] = useState(getCurrentMonth())
@@ -39,18 +76,10 @@ export default function Dashboard() {
     enabled: !!effectiveMonth,
   })
 
-  const { data: lines, isLoading: linesLoading, error: linesError } = useQuery({
+  const { data: lines, isLoading: linesLoading } = useQuery({
     queryKey: ['dashboard-lines'],
     queryFn: () => apiClient.getDashboardLines(),
   })
-
-  // Debug logging
-  console.log('Dashboard lines query result:', { lines, linesLoading, linesError })
-  
-  // If there's an error, log it
-  if (linesError) {
-    console.error('Dashboard lines query error:', linesError)
-  }
 
   const { data: categories, isLoading: categoriesLoading } = useQuery({
     queryKey: ['dashboard-categories', effectiveMonth],
@@ -76,6 +105,10 @@ export default function Dashboard() {
   }
 
   const isLoading = cardsLoading || linesLoading || categoriesLoading || merchantsLoading
+  const safeCards = isDashboardCards(cards) ? cards : null
+  const safeLines = isDashboardLines(lines) ? lines : null
+  const safeCategories = isDashboardCategories(categories) ? categories : null
+  const safeTopMerchants = isDashboardTopMerchants(topMerchants) ? topMerchants : null
 
   // Loading skeleton
   if (isLoading) {
@@ -140,24 +173,24 @@ export default function Dashboard() {
       )}
 
       {/* Metric Cards */}
-      {cards && <CardsRow cards={cards} />}
+      {safeCards && <CardsRow cards={safeCards} />}
 
       {/* Charts Row 1: Net Worth and Income vs Expenses */}
       <div className="grid gap-6 md:grid-cols-2">
-        {lines && <NetWorthArea data={lines} />}
-        {lines && <IncomeVsExpensesLines data={lines} />}
+        {safeLines && <NetWorthArea data={safeLines} />}
+        {safeLines && <IncomeVsExpensesLines data={safeLines} />}
       </div>
 
       {/* Charts Row 2: Category Breakdown */}
       <div className="grid gap-6 md:grid-cols-2">
-        {categories && <CategoryDoughnut data={categories} effectiveMonth={effectiveMonth || selectedMonth} />}
-        {categories && <TopCategoriesBar data={categories} />}
+        {safeCategories && <CategoryDoughnut data={safeCategories} effectiveMonth={effectiveMonth || selectedMonth} />}
+        {safeCategories && <TopCategoriesBar data={safeCategories} />}
       </div>
 
       {/* Bottom Row: Details and Merchants */}
       <div className="grid gap-6 md:grid-cols-2">
-        {categories && <CategoryDetailsList data={categories} />}
-        {topMerchants && <TopMerchants data={topMerchants} />}
+        {safeCategories && <CategoryDetailsList data={safeCategories} />}
+        {safeTopMerchants && <TopMerchants data={safeTopMerchants} />}
       </div>
     </div>
   )

@@ -1,8 +1,9 @@
 import axios, { AxiosResponse } from 'axios'
+import { resolveApiBaseUrl } from './runtime'
 
 // Create axios instance
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: resolveApiBaseUrl(),
   timeout: 30000,
 })
 

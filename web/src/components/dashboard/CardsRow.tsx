@@ -8,7 +8,14 @@ interface CardsRowProps {
 }
 
 export function CardsRow({ cards }: CardsRowProps) {
-  const netSavingsColor = cards.net_savings >= 0 ? 'text-green-600' : 'text-red-600'
+  const income = Number.isFinite(cards.income) ? cards.income : 0
+  const expenses = Number.isFinite(cards.expenses) ? cards.expenses : 0
+  const netSavings = Number.isFinite(cards.net_savings) ? cards.net_savings : 0
+  const totalTxns = Number.isFinite(cards.total_txns) ? cards.total_txns : 0
+  const unmapped = Number.isFinite(cards.unmapped) ? cards.unmapped : 0
+  const activeCategories = Number.isFinite(cards.active_categories) ? cards.active_categories : 0
+
+  const netSavingsColor = netSavings >= 0 ? 'text-green-600' : 'text-red-600'
   
   return (
     <div className="grid grid-cols-2 gap-3 md:gap-4 md:grid-cols-3 xl:grid-cols-6">
@@ -20,7 +27,7 @@ export function CardsRow({ cards }: CardsRowProps) {
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold text-green-600">
-            {formatCurrency(cards.income)}
+            {formatCurrency(income)}
           </div>
         </CardContent>
       </Card>
@@ -33,7 +40,7 @@ export function CardsRow({ cards }: CardsRowProps) {
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold text-red-600">
-            {formatCurrency(cards.expenses)}
+            {formatCurrency(expenses)}
           </div>
         </CardContent>
       </Card>
@@ -46,7 +53,7 @@ export function CardsRow({ cards }: CardsRowProps) {
         </CardHeader>
         <CardContent>
           <div className={`text-2xl font-bold ${netSavingsColor}`}>
-            {formatCurrency(cards.net_savings)}
+            {formatCurrency(netSavings)}
           </div>
         </CardContent>
       </Card>
@@ -59,7 +66,7 @@ export function CardsRow({ cards }: CardsRowProps) {
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">
-            {cards.total_txns.toLocaleString()}
+            {totalTxns.toLocaleString()}
           </div>
         </CardContent>
       </Card>
@@ -72,7 +79,7 @@ export function CardsRow({ cards }: CardsRowProps) {
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">
-            {cards.unmapped}
+            {unmapped}
           </div>
         </CardContent>
       </Card>
@@ -85,7 +92,7 @@ export function CardsRow({ cards }: CardsRowProps) {
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">
-            {cards.active_categories}
+            {activeCategories}
           </div>
         </CardContent>
       </Card>
