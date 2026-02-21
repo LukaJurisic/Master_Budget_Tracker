@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { PlaidLink, usePlaidLink } from "react-plaid-link";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -45,11 +45,13 @@ interface ImportSession {
   institution_name: string;
 }
 
-function PlaidLinkComponent({ token, onSuccess, onExit }: { 
+function PlaidLinkComponent({ token, onSuccess, onExit, autoOpen }: { 
   token: string; 
   onSuccess: (public_token: string) => void; 
   onExit: () => void;
+  autoOpen?: boolean;
 }) {
+  const hasAutoOpenedRef = useRef(false);
   const config = {
     token,
     onSuccess: (public_token: string, metadata: any) => {
@@ -68,6 +70,12 @@ function PlaidLinkComponent({ token, onSuccess, onExit }: {
   const { open, ready, error } = usePlaidLink(config);
 
   console.log('PlaidLink state:', { ready, error, token: token?.substring(0, 20) });
+
+  useEffect(() => {
+    if (!autoOpen || !ready || hasAutoOpenedRef.current) return;
+    hasAutoOpenedRef.current = true;
+    open();
+  }, [autoOpen, ready, open]);
 
   if (error) {
     return (
@@ -114,14 +122,66 @@ export default function SourcesEnhanced() {
   const [showAccountSelection, setShowAccountSelection] = useState(false);
   const [updateLinkToken, setUpdateLinkToken] = useState<string | null>(null);
   const [updateItemId, setUpdateItemId] = useState<number | null>(null);
+  const [autoOpenPlaid, setAutoOpenPlaid] = useState(false);
   const isMobile = useIsMobile();
   const { toast } = useToast();
   const { isDemo, features } = useAppMode();
+
+  const getPlatform = () => {
+    const capacitorPlatform = (window as any)?.Capacitor?.getPlatform?.();
+    return capacitorPlatform === "ios" || capacitorPlatform === "android"
+      ? capacitorPlatform
+      : "web";
+  };
 
   useEffect(() => {
     fetchAccounts();
     fetchImports();
   }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const isOAuthReturnPath = window.location.pathname === "/plaid/oauth-return";
+    const hasOAuthState = params.has("oauth_state_id");
+
+    if (!isOAuthReturnPath || !hasOAuthState) return;
+    if (isGettingToken || linkToken) return;
+
+    const resumePlaidOAuth = async () => {
+      try {
+        setIsGettingToken(true);
+        setAutoOpenPlaid(true);
+
+        const response = await fetch("/api/plaid/link-token", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            products: ["transactions"],
+            platform: getPlatform(),
+            received_redirect_uri: window.location.href
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to resume Plaid OAuth: ${response.status}`);
+        }
+
+        const { link_token } = await response.json();
+        setLinkToken(link_token);
+      } catch (error) {
+        console.error("Plaid OAuth resume error:", error);
+        toast({
+          title: "OAuth resume failed",
+          description: "Could not resume bank connection. Try Connect New Bank again.",
+          variant: "destructive"
+        });
+      } finally {
+        setIsGettingToken(false);
+      }
+    };
+
+    void resumePlaidOAuth();
+  }, [isGettingToken, linkToken, toast]);
 
   const fetchAccounts = async () => {
     try {
@@ -156,10 +216,11 @@ export default function SourcesEnhanced() {
     try {
       setIsGettingToken(true);
       console.log('Fetching link token...');
+      setAutoOpenPlaid(false);
       const response = await fetch("/api/plaid/link-token", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ products: ["transactions"] })
+        body: JSON.stringify({ products: ["transactions"], platform: getPlatform() })
       });
       
       if (response.ok) {
@@ -196,6 +257,9 @@ export default function SourcesEnhanced() {
       fetchAccounts();
       setUpdateLinkToken(null);
       setUpdateItemId(null);
+      if (window.location.pathname === "/plaid/oauth-return") {
+        window.history.replaceState({}, "", "/sources");
+      }
       return;
     }
     
@@ -216,6 +280,9 @@ export default function SourcesEnhanced() {
         });
         fetchAccounts();
         setLinkToken(null);
+        if (window.location.pathname === "/plaid/oauth-return") {
+          window.history.replaceState({}, "", "/sources");
+        }
       }
     } catch (error) {
       toast({
@@ -422,12 +489,18 @@ export default function SourcesEnhanced() {
                   setUpdateLinkToken(null);
                   setUpdateItemId(null);
                 }} 
+                autoOpen={autoOpenPlaid}
               />
             </div>
           </div>
         </div>
       ) : linkToken ? (
-        <PlaidLinkComponent token={linkToken} onSuccess={handleSuccess} onExit={() => setLinkToken(null)} />
+        <PlaidLinkComponent
+          token={linkToken}
+          onSuccess={handleSuccess}
+          onExit={() => setLinkToken(null)}
+          autoOpen={autoOpenPlaid}
+        />
       ) : null}
 
       {/* Connected Accounts */}

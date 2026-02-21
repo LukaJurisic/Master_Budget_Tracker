@@ -159,6 +159,7 @@ function App() {
                 <Route path="/mapping" element={<MappingStudio />} />
                 <Route path="/mapping/:importId" element={<MappingStudio />} />
                 <Route path="/sources" element={<SourcesEnhanced />} />
+                <Route path="/plaid/oauth-return" element={<SourcesEnhanced />} />
                 <Route path="/budgets" element={<Budgets />} />
                 <Route path="/debug" element={<ItemInspector />} />
               </Routes>

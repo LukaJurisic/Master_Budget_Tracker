@@ -25,8 +25,17 @@ router = APIRouter(tags=["plaid-enhanced"])
 
 # Request/Response models
 class LinkTokenRequest(BaseModel):
-    products: List[str] = ["transactions", "liabilities"]
+    products: List[str] = ["transactions"]
     account_subtypes: Optional[List[str]] = None
+    country_codes: Optional[List[str]] = None
+    language: str = "en"
+    redirect_uri: Optional[str] = None
+    received_redirect_uri: Optional[str] = None
+    android_package_name: Optional[str] = None
+    client_name: str = "Budget Tracker"
+    webhook: Optional[str] = None
+    platform: Optional[Literal["web", "ios", "android"]] = None
+    user_id: Optional[str] = None
 
 class ExchangeRequest(BaseModel):
     public_token: str
@@ -114,14 +123,29 @@ def _test_json():
 
 @router.post("/link-token")
 @router.post("/link-token/create")  # alias
-def create_link_token_endpoint(request: LinkTokenRequest, db: Session = Depends(get_database)):
+def create_link_token_endpoint(
+    request: Optional[LinkTokenRequest] = Body(default=None),
+    db: Session = Depends(get_database),
+):
     """Create a Plaid Link token."""
     print("[ROUTE DEBUG] Enhanced route handler called!")
     try:
+        payload = request or LinkTokenRequest()
         print("[ROUTE DEBUG] Creating PlaidService instance...")
         plaid = PlaidService(db)
         print("[ROUTE DEBUG] Calling plaid.create_link_token()...")
-        resp = plaid.create_link_token()
+        resp = plaid.create_link_token(
+            user_id=payload.user_id or "user-1",
+            products=payload.products,
+            country_codes=payload.country_codes,
+            language=payload.language,
+            redirect_uri=payload.redirect_uri,
+            received_redirect_uri=payload.received_redirect_uri,
+            android_package_name=payload.android_package_name,
+            client_name=payload.client_name,
+            webhook=payload.webhook,
+            platform=payload.platform,
+        )
         print(f"[ROUTE DEBUG] Got response: {resp}")
         # Add marker to prove this enhanced path is hit
         return {**resp, "_route": "enhanced-v2", "_file": __file__}

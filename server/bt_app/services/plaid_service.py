@@ -45,6 +45,20 @@ def get_plaid_client() -> plaid_api.PlaidApi:
         _plaid_client = _build_client()
     return _plaid_client
 
+
+def _to_country_codes(raw_codes: List[str]) -> List[CountryCode]:
+    """Normalize country codes into Plaid enum values."""
+    if not raw_codes:
+        raw_codes = settings.plaid_country_codes_list
+    return [CountryCode(code.upper().strip()) for code in raw_codes if code and code.strip()]
+
+
+def _to_products(raw_products: List[str]) -> List[Products]:
+    """Normalize product names into Plaid enum values."""
+    if not raw_products:
+        raw_products = settings.plaid_products_list
+    return [Products(product.strip()) for product in raw_products if product and product.strip()]
+
 class PlaidService:
     """Service class for Plaid API integration."""
     
@@ -52,58 +66,90 @@ class PlaidService:
         self.db = db
         self.client = get_plaid_client()  # Use the lazy-loaded client with correct environment
     
-    def create_link_token(self, user_id: str = "user-1", access_token: Optional[str] = None) -> Dict[str, str]:
-        """Create a one-time Link token for the frontend.
-        
-        Args:
-            user_id: Unique user identifier
-            access_token: If provided, creates an update-mode token for re-authentication
-        """
+    def create_link_token(
+        self,
+        user_id: str = "user-1",
+        access_token: Optional[str] = None,
+        products: Optional[List[str]] = None,
+        country_codes: Optional[List[str]] = None,
+        language: str = "en",
+        redirect_uri: Optional[str] = None,
+        received_redirect_uri: Optional[str] = None,
+        android_package_name: Optional[str] = None,
+        client_name: str = "Budget Tracker",
+        webhook: Optional[str] = None,
+        platform: Optional[str] = None,
+    ) -> Dict[str, str]:
+        """Create a one-time Link token for web/mobile clients."""
         import json
         from uuid import uuid4
         from plaid.exceptions import ApiException
-        
-        # Debug what we're actually using
+
         env = os.environ.get("PLAID_ENV", "unknown")
         cid = os.environ.get("PLAID_CLIENT_ID", "")
         sec = os.environ.get("PLAID_SECRET", "")
-        print(f"[PLAID CLASS DEBUG] env={env}, cid={cid[:4]}...{cid[-4:]} (len={len(cid)}), sec={sec[:4]}...{sec[-4:]} (len={len(sec)})")
-        
-        # Required by Plaid: a stable, unique ID per end user
+        print(
+            f"[PLAID CLASS DEBUG] env={env}, cid={cid[:4]}...{cid[-4:]} (len={len(cid)}), "
+            f"sec={sec[:4]}...{sec[-4:]} (len={len(sec)})"
+        )
+
         client_user_id = os.environ.get("LINK_CLIENT_USER_ID") or user_id or str(uuid4())
-        redirect_uri = os.environ.get("PLAID_REDIRECT_URI") or None  # REQUIRED for some OAuth institutions in prod
-        
-        # Build request parameters
+        resolved_redirect_uri = (
+            redirect_uri or settings.plaid_redirect_uri or os.environ.get("PLAID_REDIRECT_URI") or ""
+        ).strip() or None
+        resolved_android_package = (
+            android_package_name or settings.plaid_android_package_name or ""
+        ).strip() or None
+        resolved_received_redirect_uri = (received_redirect_uri or "").strip() or None
+        resolved_webhook = (webhook or settings.plaid_webhook_url or "").strip() or None
+        resolved_platform = (platform or "").strip().lower()
+
+        if resolved_platform == "ios" and not resolved_redirect_uri:
+            raise ValueError(
+                "PLAID_REDIRECT_URI is required for iOS OAuth institutions. "
+                "Set PLAID_REDIRECT_URI in server .env or pass redirect_uri in the link-token request."
+            )
+
+        try:
+            normalized_country_codes = _to_country_codes(country_codes or [])
+            normalized_products = _to_products(products or [])
+            if not normalized_products:
+                normalized_products = [Products("transactions")]
+        except Exception as parse_err:
+            raise ValueError(f"Invalid Plaid country/product configuration: {parse_err}") from parse_err
+
         req_params = {
             "user": LinkTokenCreateRequestUser(client_user_id=client_user_id),
-            "client_name": "Budget Tracker",
-            "country_codes": [CountryCode("CA"), CountryCode("US")],
-            "language": "en",
+            "client_name": client_name,
+            "country_codes": normalized_country_codes,
+            "language": language or "en",
         }
-        
-        # If access_token provided, this is an update-mode token for re-authentication
+
         if access_token:
             req_params["access_token"] = access_token
-            print(f"[PLAID] Creating update-mode link token for re-authentication")
+            print("[PLAID] Creating update-mode link token for re-authentication")
         else:
-            # New connection - include products
-            req_params["products"] = [Products("transactions")]
-        
-        if redirect_uri:
-            req_params["redirect_uri"] = redirect_uri
-            
+            req_params["products"] = normalized_products
+
+        if resolved_redirect_uri:
+            req_params["redirect_uri"] = resolved_redirect_uri
+        if resolved_received_redirect_uri:
+            req_params["received_redirect_uri"] = resolved_received_redirect_uri
+        if resolved_android_package:
+            req_params["android_package_name"] = resolved_android_package
+        if resolved_webhook:
+            req_params["webhook"] = resolved_webhook
+
         req = LinkTokenCreateRequest(**req_params)
-        
+
         try:
             res = self.client.link_token_create(req)
             return {"link_token": res.link_token}
         except ApiException as e:
-            # Surface the real Plaid error in our 400 to make debugging trivial
             try:
                 body = json.loads(e.body)
             except Exception:
                 body = {"error": str(e)}
-            # include a slim hint about which env we used
             body["hint_env"] = os.environ.get("PLAID_ENV")
             raise Exception(json.dumps(body))
 

@@ -1,7 +1,7 @@
 """Application configuration."""
 import os
 from pathlib import Path
-from typing import List, Literal
+from typing import List, Literal, Optional
 from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
@@ -51,6 +51,9 @@ class Settings(BaseSettings):
     plaid_secret: str
     plaid_country_codes: str = "CA,US"
     plaid_products: str = "transactions"
+    plaid_redirect_uri: Optional[str] = None
+    plaid_webhook_url: Optional[str] = None
+    plaid_android_package_name: Optional[str] = None
     
     # Server
     backend_port: int = 8000
@@ -77,12 +80,12 @@ class Settings(BaseSettings):
     @property
     def plaid_country_codes_list(self) -> List[str]:
         """Get Plaid country codes as a list."""
-        return [code.strip() for code in self.plaid_country_codes.split(",")]
+        return [code.strip() for code in self.plaid_country_codes.split(",") if code.strip()]
     
     @property
     def plaid_products_list(self) -> List[str]:
         """Get Plaid products as a list."""
-        return [product.strip() for product in self.plaid_products.split(",")]
+        return [product.strip() for product in self.plaid_products.split(",") if product.strip()]
     
     class Config:
         # .env still loads, but env var will override it now

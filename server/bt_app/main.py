@@ -84,6 +84,8 @@ app.add_middleware(
         "capacitor://localhost",
         "http://10.0.2.2:3000",
         "http://10.0.2.2",
+        "https://www.signalledger.ca",
+        "https://signalledger.ca",
     ],
     allow_credentials=True,
     allow_methods=["*"],

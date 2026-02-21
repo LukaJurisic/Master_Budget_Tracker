@@ -216,3 +216,37 @@
     - `artifacts/mobile-bugs/20260220-130209-more-mobile-pass4/screenshot.png`
   - Note from latest captures:
     - Emulator session showed missing backend data (`Failed to fetch` on Transactions), so visual validation focused on layout/interaction flow rather than data-density content.
+- 2026-02-21:
+  - Plaid iOS backend readiness pass:
+    - Added configurable Plaid settings in `server/bt_app/core/config.py`:
+      - `plaid_redirect_uri`
+      - `plaid_webhook_url`
+      - `plaid_android_package_name`
+    - Hardened product/country parsing (ignores empty entries).
+    - Extended `PlaidService.create_link_token` in `server/bt_app/services/plaid_service.py`:
+      - Supports request-level products, country codes, language, redirect URI, Android package, webhook, platform hint, and client name.
+      - Uses env/settings defaults when not provided.
+      - Enforces redirect URI when `platform=ios` (to avoid OAuth failures on iOS institutions).
+    - Extended enhanced link-token API request in `server/bt_app/api/routes_plaid_enhanced.py`:
+      - New fields: `country_codes`, `language`, `redirect_uri`, `received_redirect_uri`, `android_package_name`, `client_name`, `webhook`, `platform`, `user_id`.
+      - Pass-through wiring from route to service completed.
+    - Updated `web/src/pages/SourcesEnhanced.tsx` to send runtime platform hint (`ios`/`android`/`web`) when requesting link tokens.
+    - Updated `.env.example` with iOS OAuth redirect and optional webhook/package placeholders.
+  - OAuth redirect/resume implementation pass:
+    - Set server runtime redirect in `server/.env`:
+      - `PLAID_REDIRECT_URI=https://www.signalledger.ca/plaid/oauth-return`
+    - Added production CORS origins in `server/bt_app/main.py`:
+      - `https://www.signalledger.ca`
+      - `https://signalledger.ca`
+    - Added React route for redirect landing in `web/src/App.tsx`:
+      - `/plaid/oauth-return` -> `SourcesEnhanced`
+    - Implemented OAuth return resume logic in `web/src/pages/SourcesEnhanced.tsx`:
+      - Detects `oauth_state_id` on `/plaid/oauth-return`
+      - Requests new link token with `received_redirect_uri`
+      - Auto-opens Plaid Link when token is ready
+      - Normalizes URL back to `/sources` after success
+    - Added Vercel rewrite support for redirect landing:
+      - `web/vercel.json` rewrites `/plaid/oauth-return` to `/index.html`
+    - Validation:
+      - `python -m py_compile` passed for updated backend files.
+      - `npm run build:mobile:quick` passed.
