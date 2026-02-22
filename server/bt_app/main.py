@@ -7,7 +7,7 @@ from fastapi.responses import JSONResponse, ORJSONResponse
 from fastapi.routing import APIRoute
 
 from .core.config import settings
-from .core.db import engine
+from .core.db import engine, initialize_database_schema
 from .core.scheduler import start_scheduler, stop_scheduler
 from .models import base  # Import to register models
 from .api.routes_root import api_router
@@ -28,6 +28,12 @@ async def lifespan(app: FastAPI):
     """Application lifespan manager."""
     # Startup
     logger.info("Starting Budget Tracker API")
+    try:
+        initialize_database_schema()
+        logger.info("Database schema initialized")
+    except Exception as e:
+        logger.exception("Database schema initialization failed: %s", e)
+        raise
     
     # Start the scheduler
     try:

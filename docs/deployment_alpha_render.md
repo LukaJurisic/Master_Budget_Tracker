@@ -10,6 +10,8 @@ This project currently has no user authentication layer. Treat the backend as pr
 - Start command: `uvicorn bt_app.main:app --host 0.0.0.0 --port $PORT`
 - Health check path: `/health`
 - Python version: `3.11.11` (important; avoid Python 3.14 for current pandas pin)
+  - repo pin files included: `server/runtime.txt` and `server/.python-version`
+  - if Render service was created manually (not from `render.yaml` blueprint), still set `PYTHON_VERSION=3.11.11` in dashboard.
 
 ### Render environment variables
 
@@ -27,6 +29,10 @@ This project currently has no user authentication layer. Treat the backend as pr
 Notes:
 - Do not commit real secrets.
 - For alpha safety, use a dedicated sandbox DB first.
+- If you have NOT mounted a Render disk yet, use temporary writable path:
+  - `DATABASE_URL=sqlite:////tmp/signalledger_alpha.db`
+- Once disk is mounted at `/var/data`, switch to:
+  - `DATABASE_URL=sqlite:////var/data/signalledger_alpha.db`
 
 ## 2) Frontend Env (Vercel Production)
 

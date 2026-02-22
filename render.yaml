@@ -15,7 +15,7 @@ services:
       - key: SECRET_KEY
         sync: false
       - key: DATABASE_URL
-        sync: false
+        value: sqlite:////tmp/signalledger_alpha.db
       - key: PLAID_ENV
         sync: false
       - key: PLAID_CLIENT_ID
