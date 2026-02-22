@@ -18,28 +18,29 @@ from .routes_dashboard import router as dashboard_router
 from .routes_search import router as search_router
 from .routes_balances import router as balances_router
 from .routes_integrations import router as integrations_router
-from .deps import get_database
+from .deps import get_database, require_app_key
 
 api_router = APIRouter()
+protected = [Depends(require_app_key)]
 
 # Include all routers with their prefixes
 # api_router.include_router(plaid_router, prefix="/plaid", tags=["plaid"])  # Disabled in favor of enhanced
-api_router.include_router(plaid_enhanced_router, prefix="/plaid", tags=["plaid-enhanced"])
-api_router.include_router(sync_router, prefix="/sync", tags=["sync"])
-api_router.include_router(transactions_router, prefix="/transactions", tags=["transactions"])
-api_router.include_router(rules_router, prefix="/rules", tags=["rules"])
-api_router.include_router(uploads_router, prefix="/upload", tags=["uploads"])
-api_router.include_router(summary_router, prefix="/summary", tags=["summary"])
-api_router.include_router(budgets_router, prefix="/budgets", tags=["budgets"])
-api_router.include_router(import_router, prefix="/import", tags=["import"])
-api_router.include_router(income_router, prefix="/income", tags=["income"])
-api_router.include_router(analytics_router, prefix="/analytics", tags=["analytics"])
-api_router.include_router(analytics_freq_router, prefix="/analytics", tags=["analytics"])
-api_router.include_router(analytics_simple_router, prefix="/analytics", tags=["analytics-simple"])
-api_router.include_router(dashboard_router, prefix="/dashboard", tags=["dashboard"])
-api_router.include_router(search_router, prefix="/transactions", tags=["search"])
-api_router.include_router(balances_router, prefix="/balances", tags=["balances"])  # Account balances endpoints
-api_router.include_router(integrations_router, prefix="/integrations", tags=["integrations"])  # External integrations (NDAX, etc)
+api_router.include_router(plaid_enhanced_router, prefix="/plaid", tags=["plaid-enhanced"], dependencies=protected)
+api_router.include_router(sync_router, prefix="/sync", tags=["sync"], dependencies=protected)
+api_router.include_router(transactions_router, prefix="/transactions", tags=["transactions"], dependencies=protected)
+api_router.include_router(rules_router, prefix="/rules", tags=["rules"], dependencies=protected)
+api_router.include_router(uploads_router, prefix="/upload", tags=["uploads"], dependencies=protected)
+api_router.include_router(summary_router, prefix="/summary", tags=["summary"], dependencies=protected)
+api_router.include_router(budgets_router, prefix="/budgets", tags=["budgets"], dependencies=protected)
+api_router.include_router(import_router, prefix="/import", tags=["import"], dependencies=protected)
+api_router.include_router(income_router, prefix="/income", tags=["income"], dependencies=protected)
+api_router.include_router(analytics_router, prefix="/analytics", tags=["analytics"], dependencies=protected)
+api_router.include_router(analytics_freq_router, prefix="/analytics", tags=["analytics"], dependencies=protected)
+api_router.include_router(analytics_simple_router, prefix="/analytics", tags=["analytics-simple"], dependencies=protected)
+api_router.include_router(dashboard_router, prefix="/dashboard", tags=["dashboard"], dependencies=protected)
+api_router.include_router(search_router, prefix="/transactions", tags=["search"], dependencies=protected)
+api_router.include_router(balances_router, prefix="/balances", tags=["balances"], dependencies=protected)  # Account balances endpoints
+api_router.include_router(integrations_router, prefix="/integrations", tags=["integrations"], dependencies=protected)  # External integrations (NDAX, etc)
 
 
 @api_router.get("/health")
@@ -48,7 +49,7 @@ async def health_check():
     return {"status": "healthy"}
 
 @api_router.get("/__db")
-def db_debug(session: Session = Depends(get_database)):
+def db_debug(session: Session = Depends(get_database), _: None = Depends(require_app_key)):
     """Show the database file SQLite actually opened in this process."""
     from sqlalchemy import text
     from ..core.config import settings
@@ -67,7 +68,7 @@ def db_debug(session: Session = Depends(get_database)):
 
 # Convenience refresh endpoint
 @api_router.post("/refresh")
-async def refresh_data():
+async def refresh_data(_: None = Depends(require_app_key)):
     """Alias for /summary/refresh for convenience."""
     from .routes_summary import refresh_data as summary_refresh
     from .deps import get_database

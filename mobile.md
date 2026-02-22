@@ -250,3 +250,24 @@
     - Validation:
       - `python -m py_compile` passed for updated backend files.
       - `npm run build:mobile:quick` passed.
+- 2026-02-22:
+  - Public-backend alpha hardening pass:
+    - Added shared-key gate (`APP_SHARED_KEY`) in backend settings and dependency:
+      - `server/bt_app/core/config.py`
+      - `server/bt_app/api/deps.py`
+    - Applied server-side protection to sensitive routers in `server/bt_app/api/routes_root.py`:
+      - Plaid, transactions, balances, budgets, analytics, summary, uploads, rules, import, income, integrations, sync.
+      - Also protected `/api/__db` and `/api/refresh`.
+      - Left health endpoints unprotected (`/health`, `/api/health`).
+    - Added root health endpoint in `server/bt_app/main.py` for Render health checks.
+    - Frontend env/header wiring:
+      - `VITE_API_URL` default local fallback set to `http://localhost:8000` for web in `web/src/lib/runtime.ts`.
+      - Added `resolveAppKey()` and attached `x-app-key` header to API calls via:
+        - global fetch wrapper in `web/src/main.tsx`
+        - axios defaults in `web/src/lib/api.ts`
+    - Updated Sources API helper to use runtime origin resolution:
+      - `web/src/pages/SourcesEnhanced.tsx`
+    - Added deployment assets:
+      - `render.yaml` (Render service blueprint)
+      - `docs/deployment_alpha_render.md` (exact env/setup checklist)
+      - `web/.env.example` (Vite vars)

@@ -1,10 +1,12 @@
 import axios, { AxiosResponse } from 'axios'
-import { resolveApiBaseUrl } from './runtime'
+import { resolveApiBaseUrl, resolveAppKey } from './runtime'
 
 // Create axios instance
+const appKey = resolveAppKey()
 const api = axios.create({
   baseURL: resolveApiBaseUrl(),
   timeout: 30000,
+  headers: appKey ? { 'x-app-key': appKey } : {},
 })
 
 // Response interceptor for error handling

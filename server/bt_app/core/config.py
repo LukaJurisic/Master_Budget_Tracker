@@ -61,6 +61,7 @@ class Settings(BaseSettings):
     
     # Security
     secret_key: str
+    app_shared_key: Optional[str] = None
     
     # Feature Flags
     enable_plaid_in_demo: bool = False

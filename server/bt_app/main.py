@@ -1,7 +1,7 @@
 """Main FastAPI application."""
 import logging
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, ORJSONResponse
 from fastapi.routing import APIRoute
@@ -11,8 +11,8 @@ from .core.db import engine
 from .core.scheduler import start_scheduler, stop_scheduler
 from .models import base  # Import to register models
 from .api.routes_root import api_router
-from .api.routes_analytics_freq import router as analytics_freq_router
 from .api.routes_system import router as system_router
+from .api.deps import require_app_key
 # from .api.routes_ndax import router as ndax_router  # DISABLED - using old integrations router instead
 
 # Configure logging
@@ -95,9 +95,6 @@ app.add_middleware(
 # Include API router
 app.include_router(api_router, prefix="/api")
 
-# Mount the frequency router under the same prefix the FE expects
-app.include_router(analytics_freq_router, prefix="/api/analytics", tags=["analytics"])
-
 # Mount the system router for app mode and health checks
 app.include_router(system_router, prefix="/api/system", tags=["system"])
 
@@ -115,8 +112,14 @@ async def root():
     }
 
 
+@app.get("/health")
+async def root_health():
+    """Platform-friendly health endpoint."""
+    return {"status": "healthy"}
+
+
 @app.get("/__routes")
-def __routes():
+def __routes(_: None = Depends(require_app_key)):
     """Debug endpoint to see which file handles each route."""
     out = []
     for r in app.routes:
@@ -131,7 +134,7 @@ def __routes():
 
 
 @app.get("/__version")
-def version():
+def version(_: None = Depends(require_app_key)):
     """Version endpoint to track what backend build is running."""
     from datetime import datetime
     import os, subprocess
@@ -153,7 +156,7 @@ def version():
     }
 
 @app.get("/__debug/database")
-def debug_database():
+def debug_database(_: None = Depends(require_app_key)):
     """Debug database configuration."""
     import os
     from .core.config import settings

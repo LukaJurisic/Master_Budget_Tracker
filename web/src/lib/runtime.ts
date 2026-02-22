@@ -34,7 +34,7 @@ export function resolveApiOrigin(): string {
     return "http://10.0.2.2:8000";
   }
 
-  return "";
+  return "http://localhost:8000";
 }
 
 export function resolveApiBaseUrl(): string {
@@ -58,4 +58,8 @@ export function rewriteApiUrlForNative(inputUrl: string): string {
   }
 
   return inputUrl;
+}
+
+export function resolveAppKey(): string {
+  return import.meta.env.VITE_APP_KEY?.trim() ?? "";
 }

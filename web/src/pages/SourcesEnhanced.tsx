@@ -13,6 +13,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { CalendarIcon, RefreshCw, Download, Building2, CreditCard, AlertCircle } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { resolveApiOrigin } from "@/lib/runtime";
 import { useToast } from "@/components/ui/use-toast";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { useIsMobile } from "@/hooks/useIsMobile";
@@ -338,7 +339,7 @@ export default function SourcesEnhanced() {
     }
   };
 
-  const API = (p: string) => `${import.meta.env.VITE_API_URL ?? ""}${p}`;
+  const API = (p: string) => `${resolveApiOrigin()}${p}`;
 
   const handleImport = async () => {
     try {
