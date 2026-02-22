@@ -36,6 +36,31 @@
   - `user_id`/tenant-ready schema plan (later migration)
   - environment-based config split for personal vs production SaaS
 
+## Localhost Non-Regression Contract (Hard Requirement)
+- Your local personal finance tracking on localhost is the primary system of record.
+- Mobile/public deployment work must be additive only and must never override local behavior.
+- Local DB and cloud DB are separate on purpose:
+  - Local: `DATABASE_URL` in `server/.env` points to your personal main DB.
+  - Cloud alpha: Render `DATABASE_URL` points to alpha/sandbox DB.
+- Never auto-rewrite local env files during deployment tasks.
+- Never point local frontend to public backend by default.
+
+### Required local env pairing
+- `server/.env`
+  - `APP_SHARED_KEY=<local-secret>`
+  - `DATABASE_URL=<your-local-main-db>`
+- `web/.env.local`
+  - `VITE_APP_KEY=<same-local-secret>`
+  - `VITE_API_URL=http://localhost:8020` (or your active local backend port)
+
+### Local smoke check after any mobile/deploy change
+1. Start backend: `.\start-backend.ps1 -Port 8020`
+2. Start frontend: `.\start-frontend.ps1`
+3. Open `http://localhost:3000`
+4. Confirm Dashboard and Transactions load local data.
+5. Confirm no errors for protected endpoints (`x-app-key` mismatch should not occur locally).
+6. Confirm local `DATABASE_URL` is unchanged.
+
 ## Apple Review Guardrails (from cheat sheet validation logic)
 - Build readiness:
   - Attached build exists, not expired, processing state is `VALID`.
@@ -166,10 +191,10 @@
 ## Next Milestone
 - Android emulator loop (Windows):
   - `cd web`
-  - If backend runs on `8000`:
+  - If backend runs on `8020`:
     - `npm run build:android:quick`
-  - If backend runs on `8010` (port conflict workaround):
-    - PowerShell: `$env:VITE_API_URL='http://10.0.2.2:8010'; npm run build:android:quick`
+  - If backend runs on a non-default port:
+    - PowerShell: `$env:VITE_API_URL='http://10.0.2.2:<PORT>'; npm run build:android:quick`
   - `npm run cap:open:android`
   - Run on emulator from Android Studio
 - Direct deploy path (Windows terminal):
@@ -177,7 +202,7 @@
   - `./gradlew.bat installDebug`
 - Backend start (Windows terminal):
   - `cd budget-tracker`
-  - `.\.venv\Scripts\python.exe -m uvicorn bt_app.main:app --reload --port 8010`
+  - `.\.venv\Scripts\python.exe -m uvicorn bt_app.main:app --reload --port 8020`
 - Fast bug capture (Windows terminal):
   - `.\capture-bug.ps1 -Label "short-description"`
   - Output goes to `artifacts\mobile-bugs\<timestamp>-<label>`
@@ -261,7 +286,7 @@
       - Left health endpoints unprotected (`/health`, `/api/health`).
     - Added root health endpoint in `server/bt_app/main.py` for Render health checks.
     - Frontend env/header wiring:
-      - `VITE_API_URL` default local fallback set to `http://localhost:8000` for web in `web/src/lib/runtime.ts`.
+      - `VITE_API_URL` default local fallback set to `http://localhost:8020` for web in `web/src/lib/runtime.ts`.
       - Added `resolveAppKey()` and attached `x-app-key` header to API calls via:
         - global fetch wrapper in `web/src/main.tsx`
         - axios defaults in `web/src/lib/api.ts`
@@ -271,3 +296,11 @@
       - `render.yaml` (Render service blueprint)
       - `docs/deployment_alpha_render.md` (exact env/setup checklist)
       - `web/.env.example` (Vite vars)
+  - iOS cloud build readiness (no local Mac) pass:
+    - Added Codemagic workflow config:
+      - `codemagic.yaml` (`ios-testflight`)
+    - Added Codemagic + TestFlight runbook:
+      - `docs/ios_release_codemagic.md`
+    - Workflow now expects Codemagic env group `signalledger_ios` with:
+      - `VITE_API_URL` (Render backend URL)
+      - `VITE_APP_KEY` (same as backend `APP_SHARED_KEY`)

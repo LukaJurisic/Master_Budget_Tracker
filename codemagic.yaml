@@ -1,0 +1,53 @@
+workflows:
+  ios-testflight:
+    name: SignalLedger iOS TestFlight
+    max_build_duration: 120
+    instance_type: mac_mini_m2
+    environment:
+      node: 20.11.1
+      xcode: latest
+      vars:
+        BUNDLE_ID: com.lukajurisic.budgettracker
+        XCODE_PROJECT: web/ios/App/App.xcodeproj
+        XCODE_SCHEME: App
+      groups:
+        - signalledger_ios
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: $BUNDLE_ID
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: mobile
+          include: true
+          source: true
+    scripts:
+      - name: Validate build-time env vars
+        script: |
+          set -euo pipefail
+          : "${VITE_API_URL:?Set VITE_API_URL in Codemagic env group}"
+          : "${VITE_APP_KEY:?Set VITE_APP_KEY in Codemagic env group}"
+      - name: Install web dependencies
+        script: |
+          cd web
+          npm ci
+      - name: Build web + sync Capacitor iOS shell
+        script: |
+          cd web
+          npm run build:mobile:quick
+      - name: Apply iOS signing profiles
+        script: |
+          xcode-project use-profiles
+      - name: Build signed IPA
+        script: |
+          xcode-project build-ipa \
+            --project "$XCODE_PROJECT" \
+            --scheme "$XCODE_SCHEME"
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
