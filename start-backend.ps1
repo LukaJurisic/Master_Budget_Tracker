@@ -21,14 +21,13 @@ try {
         Start-Sleep -Milliseconds 500
     }
 
-    $envScript = Join-Path $repoRoot '.venv\Scripts\Activate.ps1'
-    if (-not (Test-Path $envScript)) {
-        throw "Virtual environment not found at $envScript"
+    $pythonExe = Join-Path $repoRoot '.venv\Scripts\python.exe'
+    if (-not (Test-Path $pythonExe)) {
+        throw "Virtual environment Python not found at $pythonExe"
     }
 
     Set-Location (Join-Path $repoRoot 'server')
-    & $envScript
-    uvicorn bt_app.main:app --reload --port $Port
+    & $pythonExe -m uvicorn bt_app.main:app --reload --port $Port
 } finally {
     Pop-Location
 }
