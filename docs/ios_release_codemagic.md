@@ -21,6 +21,7 @@ This repo is prepared to build iOS from `mobile` branch via `codemagic.yaml`.
 2. Make sure repository root is used (workflow file mode).
 3. In team settings, connect App Store Connect integration.
   - This is used by `publishing.app_store_connect.auth: integration`.
+  - In `codemagic.yaml`, set `workflows.ios-testflight.integrations.app_store_connect` to the exact integration key name from Codemagic (currently placeholder: `signalledger_asc`).
 4. Create env group named `signalledger_ios`.
 5. Add these env vars into `signalledger_ios`:
   - `VITE_API_URL=https://<your-render-backend>.onrender.com`
