@@ -341,3 +341,23 @@
       - Localhost run succeeded for all primary routes.
       - Production run surfaced CORS failures on analytics endpoint:
         - `https://master-budget-tracker.onrender.com/api/analytics/available-months`
+  - Wrapped-style Year in Review v1:
+    - Added new page:
+      - `web/src/pages/YearInReview.tsx`
+    - Added navigation wiring:
+      - Sidebar link and mobile bottom-tab entry in `web/src/App.tsx`
+      - Route path: `/year-in-review`
+    - Added yearly cohort controls:
+      - Year chips generated from available data years (minimum cohort year: 2022)
+    - Added wrapped slides:
+      - Intro totals
+      - Cashflow pulse chart
+      - Category champion
+      - Merchant MVP
+      - Finale
+    - Added optional soundtrack mode:
+      - Browser Web Audio loop toggled by a play/pause button.
+    - Added Playwright capture route:
+      - `/year-in-review` now included in `web/scripts/capture-mobile.mjs`
+    - Fixed Year in Review API mismatch:
+      - Removed dependency on missing `/analytics/transaction-counts` endpoint.

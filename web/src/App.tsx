@@ -12,7 +12,8 @@ import {
   TrendingUp,
   BarChart3,
   Wallet,
-  MoreHorizontal
+  MoreHorizontal,
+  Sparkles
 } from 'lucide-react'
 
 // Pages
@@ -25,6 +26,7 @@ import Budgets from './pages/Budgets'
 import ItemInspector from './pages/ItemInspector'
 import Income from './pages/Income'
 import BalancesPage from './pages/BalancesPage'
+import YearInReview from './pages/YearInReview'
 
 // Components
 import { Button } from './components/ui/button'
@@ -35,6 +37,7 @@ import { AppModeProvider } from './contexts/AppModeContext'
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
   { name: 'Analytics', href: '/analytics', icon: BarChart3 },
+  { name: 'Year in Review', href: '/year-in-review', icon: Sparkles },
   { name: 'Balances', href: '/balances', icon: Wallet },
   { name: 'Transactions', href: '/transactions', icon: CreditCard },
   { name: 'Income', href: '/income', icon: TrendingUp },
@@ -49,6 +52,7 @@ const mobileNavigation = [
   { name: 'Txns', href: '/transactions', icon: CreditCard },
   { name: 'Map', href: '/mapping', icon: Settings },
   { name: 'Budgets', href: '/budgets', icon: Target },
+  { name: 'Wrapped', href: '/year-in-review', icon: Sparkles },
   { name: 'More', href: '/sources', icon: MoreHorizontal },
 ]
 
@@ -153,6 +157,7 @@ function App() {
               <Routes>
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/analytics" element={<AnalyticsDashboard />} />
+                <Route path="/year-in-review" element={<YearInReview />} />
                 <Route path="/balances" element={<BalancesPage />} />
                 <Route path="/transactions" element={<Transactions />} />
                 <Route path="/income" element={<Income />} />
@@ -169,7 +174,7 @@ function App() {
 
         {/* Mobile bottom navigation */}
         <nav className="safe-area-bottom fixed bottom-0 left-0 right-0 z-40 border-t bg-white/95 backdrop-blur lg:hidden">
-          <div className="mx-auto grid max-w-md grid-cols-5">
+          <div className="mx-auto grid max-w-md" style={{ gridTemplateColumns: `repeat(${mobileNavigation.length}, minmax(0, 1fr))` }}>
             {mobileNavigation.map((item) => {
               const isActive = isActiveRoute(location.pathname, item.href)
               return (

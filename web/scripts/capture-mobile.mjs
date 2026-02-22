@@ -34,6 +34,7 @@ const routes = [
   { name: "budgets", path: "/budgets" },
   { name: "sources", path: "/sources" },
   { name: "analytics", path: "/analytics" },
+  { name: "year-in-review", path: "/year-in-review" },
 ];
 
 const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
