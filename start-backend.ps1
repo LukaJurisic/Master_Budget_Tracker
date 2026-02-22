@@ -1,5 +1,5 @@
 param(
-    [int]$Port = 8000
+    [int]$Port = 8020
 )
 
 Write-Host ">>> Starting Budget Tracker Backend on port $Port..." -ForegroundColor Green

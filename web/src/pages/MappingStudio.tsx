@@ -502,7 +502,7 @@ export default function MappingStudio() {
                                     ))}
                                   </>
                                 ) : (
-                                  <SelectItem value="" disabled>No categories available</SelectItem>
+                                  <SelectItem value="__no_categories__" disabled>No categories available</SelectItem>
                                 )}
                               </SelectContent>
                             </Select>
@@ -605,7 +605,7 @@ export default function MappingStudio() {
                                       ))}
                                     </>
                                   ) : (
-                                    <SelectItem value="" disabled>No categories available</SelectItem>
+                                    <SelectItem value="__no_categories__" disabled>No categories available</SelectItem>
                                   )}
                                 </SelectContent>
                               </Select>

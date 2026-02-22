@@ -1,5 +1,5 @@
 param(
-    [int]$Port = 8000
+    [int]$Port = 8020
 )
 
 $repoRoot = Split-Path -Parent $MyInvocation.MyCommand.Path

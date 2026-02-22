@@ -56,7 +56,7 @@ class Settings(BaseSettings):
     plaid_android_package_name: Optional[str] = None
     
     # Server
-    backend_port: int = 8000
+    backend_port: int = 8020
     frontend_port: int = 3000
     
     # Security

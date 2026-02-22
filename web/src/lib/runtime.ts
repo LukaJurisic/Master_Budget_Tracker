@@ -31,10 +31,10 @@ export function resolveApiOrigin(): string {
 
   // Android emulator reaches host machine via 10.0.2.2
   if (hasCapacitorNativeRuntime()) {
-    return "http://10.0.2.2:8000";
+    return "http://10.0.2.2:8020";
   }
 
-  return "http://localhost:8000";
+  return "http://localhost:8020";
 }
 
 export function resolveApiBaseUrl(): string {
