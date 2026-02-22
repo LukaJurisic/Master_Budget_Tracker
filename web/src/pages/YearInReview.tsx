@@ -1,13 +1,22 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { BarChart, Bar, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts'
-import { ChevronLeft, ChevronRight, Music2, Pause, Play, Sparkles, Trophy, Wallet, Landmark } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Expand, Landmark, Music2, Pause, Play, Sparkles, Trophy, Wallet, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { apiClient } from '@/lib/api'
 import { formatCurrency } from '@/lib/utils'
 
 const MIN_YEAR = 2022
+const STORY_INTERVAL_MS = 5000
+
+type WrappedSlide = {
+  id: string
+  title: string
+  subtitle: string
+  accent: string
+  body: ReactNode
+}
 
 function useWrappedSoundtrack() {
   const audioContextRef = useRef<AudioContext | null>(null)
@@ -112,11 +121,181 @@ function monthLabel(month: string) {
   return date.toLocaleString('en-CA', { month: 'short', year: 'numeric' })
 }
 
+function drawWrappedText(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, maxWidth: number, lineHeight: number) {
+  const words = text.split(' ')
+  let line = ''
+  let currentY = y
+
+  words.forEach((word) => {
+    const candidate = `${line}${word} `
+    if (ctx.measureText(candidate).width > maxWidth && line) {
+      ctx.fillText(line.trim(), x, currentY)
+      line = `${word} `
+      currentY += lineHeight
+    } else {
+      line = candidate
+    }
+  })
+
+  if (line) {
+    ctx.fillText(line.trim(), x, currentY)
+  }
+}
+
+async function createWrappedCardBlob(year: number, income: number, savings: number, category: string, merchant: string) {
+  const width = 1080
+  const height = 1920
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return null
+
+  const gradient = ctx.createLinearGradient(0, 0, width, height)
+  gradient.addColorStop(0, '#c026d3')
+  gradient.addColorStop(0.5, '#4f46e5')
+  gradient.addColorStop(1, '#06b6d4')
+  ctx.fillStyle = gradient
+  ctx.fillRect(0, 0, width, height)
+
+  ctx.fillStyle = 'rgba(255,255,255,0.9)'
+  ctx.font = '700 44px -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif'
+  ctx.fillText('SignalLedger Wrapped', 80, 120)
+  ctx.font = '700 92px -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif'
+  ctx.fillText(`${year}`, 80, 250)
+  ctx.font = '600 54px -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif'
+  ctx.fillText('Year in Review', 80, 330)
+
+  ctx.fillStyle = 'rgba(255,255,255,0.2)'
+  ctx.fillRect(80, 420, width - 160, 330)
+  ctx.fillRect(80, 790, width - 160, 250)
+  ctx.fillRect(80, 1080, width - 160, 520)
+
+  ctx.fillStyle = 'rgba(255,255,255,0.95)'
+  ctx.font = '500 30px -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif'
+  ctx.fillText('Income', 120, 490)
+  ctx.font = '700 62px -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif'
+  ctx.fillText(formatCurrency(income), 120, 570)
+
+  ctx.font = '500 30px -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif'
+  ctx.fillText('Net Savings', 120, 660)
+  ctx.font = '700 62px -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif'
+  ctx.fillText(formatCurrency(savings), 120, 740)
+
+  ctx.font = '700 42px -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif'
+  ctx.fillText('Top Category', 120, 860)
+  ctx.font = '600 44px -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif'
+  drawWrappedText(ctx, category || 'No category data', 120, 920, width - 240, 56)
+
+  ctx.font = '700 42px -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif'
+  ctx.fillText('Top Merchant', 120, 1150)
+  ctx.font = '600 44px -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif'
+  drawWrappedText(ctx, merchant || 'No merchant data', 120, 1210, width - 240, 56)
+
+  ctx.font = '500 28px -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif'
+  ctx.fillStyle = 'rgba(255,255,255,0.85)'
+  ctx.fillText('Generated with SignalLedger', 80, height - 90)
+
+  return new Promise<Blob | null>((resolve) => {
+    canvas.toBlob((blob) => resolve(blob), 'image/png')
+  })
+}
+
+function WrappedStoryCard({
+  slide,
+  slideIndex,
+  slideCount,
+  canGoPrev,
+  canGoNext,
+  onPrev,
+  onNext,
+  onJump,
+  onTapAdvance,
+  touchStartX,
+  fullScreen = false,
+}: {
+  slide: WrappedSlide
+  slideIndex: number
+  slideCount: number
+  canGoPrev: boolean
+  canGoNext: boolean
+  onPrev: () => void
+  onNext: () => void
+  onJump: (index: number) => void
+  onTapAdvance: () => void
+  touchStartX: React.MutableRefObject<number | null>
+  fullScreen?: boolean
+}) {
+  const progress = ((slideIndex + 1) / Math.max(1, slideCount)) * 100
+
+  return (
+    <Card
+      className={`relative overflow-hidden rounded-3xl border-0 bg-gradient-to-br ${slide.accent} ${fullScreen ? 'h-full' : ''}`}
+      onTouchStart={(event) => {
+        touchStartX.current = event.touches[0].clientX
+      }}
+      onTouchEnd={(event) => {
+        const startX = touchStartX.current
+        const endX = event.changedTouches[0].clientX
+        if (startX === null) return
+        const delta = endX - startX
+        if (delta > 45 && canGoPrev) onPrev()
+        if (delta < -45 && canGoNext) onNext()
+        touchStartX.current = null
+      }}
+      onClick={(event) => {
+        const target = event.target as HTMLElement
+        if (target.closest('button')) return
+        onTapAdvance()
+      }}
+    >
+      <CardContent className={`relative p-5 ${fullScreen ? 'h-full flex flex-col justify-between' : ''}`}>
+        <div className="mb-4 h-1.5 w-full overflow-hidden rounded-full bg-white/25">
+          <div className="h-full rounded-full bg-white transition-all duration-300" style={{ width: `${progress}%` }} />
+        </div>
+        <div className="mb-3 flex items-center justify-between text-white">
+          <div>
+            <p className="text-xs uppercase tracking-[0.2em] text-white/80">SignalLedger Wrapped</p>
+            <h2 className={`${fullScreen ? 'text-3xl' : 'text-2xl'} font-bold`}>{slide.title}</h2>
+            <p className={`${fullScreen ? 'text-base' : 'text-sm'} text-white/85`}>{slide.subtitle}</p>
+          </div>
+          <Sparkles className="h-6 w-6 animate-pulse" />
+        </div>
+
+        {slide.body}
+
+        <div className="mt-5 flex items-center justify-between">
+          <Button variant="secondary" size="sm" onClick={onPrev} disabled={!canGoPrev}>
+            <ChevronLeft className="mr-1 h-4 w-4" />
+            Prev
+          </Button>
+          <div className="flex gap-1">
+            {Array.from({ length: slideCount }, (_, index) => (
+              <button
+                key={`dot-${index}`}
+                onClick={() => onJump(index)}
+                className={`h-2.5 w-2.5 rounded-full ${index === slideIndex ? 'bg-white' : 'bg-white/40'}`}
+                aria-label={`Go to slide ${index + 1}`}
+              />
+            ))}
+          </div>
+          <Button variant="secondary" size="sm" onClick={onNext} disabled={!canGoNext}>
+            Next
+            <ChevronRight className="ml-1 h-4 w-4" />
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
 export default function YearInReview() {
   const [selectedYear, setSelectedYear] = useState<number | null>(null)
   const [slideIndex, setSlideIndex] = useState(0)
   const [musicOn, setMusicOn] = useState(false)
   const [autoPlay, setAutoPlay] = useState(true)
+  const [storyModeOpen, setStoryModeOpen] = useState(false)
+  const [isSharingCard, setIsSharingCard] = useState(false)
   const { start, stop } = useWrappedSoundtrack()
   const touchStartX = useRef<number | null>(null)
 
@@ -129,9 +308,15 @@ export default function YearInReview() {
     const minY = toYear(availableMonths?.min_month)
     const maxY = toYear(availableMonths?.max_month)
     if (!minY || !maxY) return []
+
+    const currentYear = new Date().getFullYear()
+    const highestCompletedYear = currentYear - 1
+    const boundedMax = Math.min(maxY, highestCompletedYear)
+    const boundedMin = Math.max(minY, MIN_YEAR)
+    if (boundedMax < boundedMin) return []
+
     const years: number[] = []
-    const from = Math.max(minY, MIN_YEAR)
-    for (let year = maxY; year >= from; year -= 1) {
+    for (let year = boundedMax; year >= boundedMin; year -= 1) {
       years.push(year)
     }
     return years
@@ -139,6 +324,10 @@ export default function YearInReview() {
 
   useEffect(() => {
     if (!selectedYear && availableYears.length > 0) {
+      setSelectedYear(availableYears[0])
+      return
+    }
+    if (selectedYear && !availableYears.includes(selectedYear) && availableYears.length > 0) {
       setSelectedYear(availableYears[0])
     }
   }, [availableYears, selectedYear])
@@ -154,16 +343,6 @@ export default function YearInReview() {
   useEffect(() => {
     setSlideIndex(0)
   }, [selectedYear])
-
-  useEffect(() => {
-    if (!autoPlay) return
-    const id = window.setInterval(() => {
-      setSlideIndex((prev) => (prev + 1) % 6)
-    }, 5000)
-    return () => {
-      window.clearInterval(id)
-    }
-  }, [autoPlay])
 
   const dateFrom = selectedYear ? `${selectedYear}-01-01` : ''
   const dateTo = selectedYear ? `${selectedYear}-12-31` : ''
@@ -215,10 +394,54 @@ export default function YearInReview() {
     return savings.reduce((best, row) => (row.net_savings > best.net_savings ? row : best), savings[0])
   }, [summaryRange?.savings_by_month])
 
-  const slides = [
+  const handleShareCard = async () => {
+    if (!selectedYear || isSharingCard) return
+    setIsSharingCard(true)
+    try {
+      const blob = await createWrappedCardBlob(
+        selectedYear,
+        summaryRange?.income_total ?? 0,
+        summaryRange?.savings_total ?? 0,
+        topCategory?.category ?? '',
+        topMerchant?.merchant ?? ''
+      )
+      if (!blob) return
+
+      const text = `My ${selectedYear} Wrapped: saved ${formatCurrency(summaryRange?.savings_total ?? 0)} on income ${formatCurrency(summaryRange?.income_total ?? 0)} in SignalLedger.`
+      const file = new File([blob], `signalledger-wrapped-${selectedYear}.png`, { type: 'image/png' })
+      const nav = navigator as Navigator & {
+        canShare?: (data: ShareData) => boolean
+      }
+
+      if (nav.share && nav.canShare && nav.canShare({ files: [file] })) {
+        await nav.share({
+          title: `${selectedYear} Wrapped`,
+          text,
+          files: [file],
+        })
+        return
+      }
+
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `signalledger-wrapped-${selectedYear}.png`
+      link.click()
+      URL.revokeObjectURL(url)
+      if (navigator.clipboard) {
+        await navigator.clipboard.writeText(text)
+      }
+    } catch {
+      // noop
+    } finally {
+      setIsSharingCard(false)
+    }
+  }
+
+  const slides: WrappedSlide[] = useMemo(() => [
     {
       id: 'intro',
-      title: `${selectedYear ?? 'This Year'} Wrapped`,
+      title: `${selectedYear ?? 'Year'} Wrapped`,
       subtitle: 'A quick rewind of your money story',
       accent: 'from-fuchsia-600 via-indigo-500 to-cyan-400',
       body: (
@@ -246,9 +469,9 @@ export default function YearInReview() {
       accent: 'from-sky-500 via-blue-500 to-indigo-600',
       body: (
         <div className="space-y-3">
-            <div className="h-48 rounded-xl bg-white/10 p-2">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData}>
+          <div className="h-48 rounded-xl bg-white/10 p-2">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.2)" />
                 <XAxis dataKey="month" tick={{ fill: 'white', fontSize: 10 }} />
                 <YAxis tick={{ fill: 'white', fontSize: 10 }} />
@@ -256,9 +479,9 @@ export default function YearInReview() {
                 <Bar dataKey="income" fill="#34d399" radius={[4, 4, 0, 0]} />
                 <Bar dataKey="expenses" fill="#fb7185" radius={[4, 4, 0, 0]} />
                 <Bar dataKey="savings" fill="#a78bfa" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
           {chartData.length === 0 && (
             <p className="text-xs text-white/80">No monthly chart data for this year yet.</p>
           )}
@@ -306,7 +529,7 @@ export default function YearInReview() {
           <div className="grid grid-cols-2 gap-3">
             <div className="rounded-lg bg-white/10 p-3 text-white">
               <p className="text-[11px] uppercase text-white/70">Months Tracked</p>
-              <p className="text-xl font-bold">{summaryRange?.months?.length ?? 0}</p>
+              <p className="text-xl font-bold">{chartData.length}</p>
             </div>
             <div className="rounded-lg bg-white/10 p-3 text-white">
               <p className="text-[11px] uppercase text-white/70">Best Savings Month</p>
@@ -326,13 +549,13 @@ export default function YearInReview() {
           <div className="rounded-xl bg-white/15 p-3 backdrop-blur">
             <p className="text-[11px] uppercase tracking-wide text-white/75">Peak income month</p>
             <p className="mt-1 text-xl font-bold text-white">
-              {peakIncomeMonth ? `${monthLabel(peakIncomeMonth.month)} · ${formatCurrency(peakIncomeMonth.income)}` : 'No data'}
+              {peakIncomeMonth ? `${monthLabel(peakIncomeMonth.month)} - ${formatCurrency(peakIncomeMonth.income)}` : 'No data'}
             </p>
           </div>
           <div className="rounded-xl bg-white/15 p-3 backdrop-blur">
             <p className="text-[11px] uppercase tracking-wide text-white/75">Strongest savings month</p>
             <p className="mt-1 text-xl font-bold text-white">
-              {strongestSavingsMonth ? `${monthLabel(strongestSavingsMonth.month)} · ${formatCurrency(strongestSavingsMonth.net_savings)}` : 'No data'}
+              {strongestSavingsMonth ? `${monthLabel(strongestSavingsMonth.month)} - ${formatCurrency(strongestSavingsMonth.net_savings)}` : 'No data'}
             </p>
           </div>
           <div className="rounded-xl bg-white/15 p-3 backdrop-blur">
@@ -368,34 +591,70 @@ export default function YearInReview() {
               <p className="text-[11px]">Growth</p>
             </div>
           </div>
-          <Button
-            variant="secondary"
-            size="sm"
-            className="w-full"
-            onClick={async () => {
-              const text = `My ${selectedYear} Wrapped: saved ${formatCurrency(summaryRange?.savings_total ?? 0)} on income ${formatCurrency(summaryRange?.income_total ?? 0)} in SignalLedger.`
-              if (navigator.share) {
-                try {
-                  await navigator.share({ title: `${selectedYear} Wrapped`, text })
-                } catch {
-                  // noop
-                }
-              } else {
-                await navigator.clipboard.writeText(text)
-              }
-            }}
-          >
-            Share Highlights
+          <Button variant="secondary" size="sm" className="w-full" onClick={handleShareCard} disabled={isSharingCard}>
+            {isSharingCard ? 'Preparing Card...' : 'Share Highlights'}
           </Button>
         </div>
       ),
     },
-  ]
+  ], [
+    chartData,
+    handleShareCard,
+    isSharingCard,
+    peakIncomeMonth,
+    peakSavings,
+    selectedYear,
+    strongestSavingsMonth,
+    summaryRange?.expense_avg,
+    summaryRange?.income_avg,
+    summaryRange?.income_total,
+    summaryRange?.pct_saved,
+    summaryRange?.savings_total,
+    topCategory?.category,
+    topCategory?.total_amount,
+    topCategories?.data,
+    topMerchant?.merchant,
+    topMerchant?.total_amount,
+  ])
 
-  const activeSlide = slides[slideIndex] ?? slides[0]
-  const canGoPrev = slideIndex > 0
-  const canGoNext = slideIndex < slides.length - 1
-  const progress = ((slideIndex + 1) / slides.length) * 100
+  useEffect(() => {
+    if (!autoPlay || slides.length === 0) return
+    const id = window.setInterval(() => {
+      setSlideIndex((prev) => (prev + 1) % slides.length)
+    }, STORY_INTERVAL_MS)
+    return () => {
+      window.clearInterval(id)
+    }
+  }, [autoPlay, slides.length])
+
+  useEffect(() => {
+    if (!storyModeOpen) return
+    if (!navigator.vibrate) return
+    navigator.vibrate(8)
+  }, [slideIndex, storyModeOpen])
+
+  const boundedSlideIndex = Math.min(slideIndex, Math.max(0, slides.length - 1))
+  const activeSlide = slides[boundedSlideIndex] ?? slides[0]
+  const canGoPrev = boundedSlideIndex > 0
+  const canGoNext = boundedSlideIndex < slides.length - 1
+
+  const goPrev = () => {
+    if (!canGoPrev) return
+    setSlideIndex((prev) => prev - 1)
+  }
+
+  const goNext = () => {
+    if (!canGoNext) return
+    setSlideIndex((prev) => prev + 1)
+  }
+
+  const tapAdvance = () => {
+    if (canGoNext) {
+      goNext()
+      return
+    }
+    setSlideIndex(0)
+  }
 
   return (
     <div className="space-y-4">
@@ -408,15 +667,15 @@ export default function YearInReview() {
             </h1>
             <p className="text-sm text-muted-foreground">Spotify-style finance recap by year cohort</p>
           </div>
-          <Button
-            variant={musicOn ? 'default' : 'outline'}
-            size="sm"
-            className="shrink-0"
-            onClick={() => setMusicOn((prev) => !prev)}
-          >
-            <Music2 className="mr-2 h-4 w-4" />
-            {musicOn ? <Pause className="h-3 w-3" /> : <Play className="h-3 w-3" />}
-          </Button>
+          <div className="flex shrink-0 gap-2">
+            <Button variant={musicOn ? 'default' : 'outline'} size="sm" onClick={() => setMusicOn((prev) => !prev)}>
+              <Music2 className="mr-2 h-4 w-4" />
+              {musicOn ? <Pause className="h-3 w-3" /> : <Play className="h-3 w-3" />}
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => setStoryModeOpen(true)} disabled={!selectedYear}>
+              <Expand className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
 
         <div className="mt-4 flex flex-wrap gap-2">
@@ -450,64 +709,52 @@ export default function YearInReview() {
       {!summaryLoading && !selectedYear && (
         <Card className="rounded-3xl">
           <CardContent className="p-6">
-            <p className="text-sm text-muted-foreground">No yearly data available yet.</p>
+            <p className="text-sm text-muted-foreground">No completed years available yet. Wrapped unlocks after year-end.</p>
           </CardContent>
         </Card>
       )}
 
-      {!summaryLoading && selectedYear && (
-        <Card
-          className={`relative overflow-hidden rounded-3xl border-0 bg-gradient-to-br ${activeSlide.accent}`}
-          onTouchStart={(event) => {
-            touchStartX.current = event.touches[0].clientX
-          }}
-          onTouchEnd={(event) => {
-            const startX = touchStartX.current
-            const endX = event.changedTouches[0].clientX
-            if (startX === null) return
-            const delta = endX - startX
-            if (delta > 45 && canGoPrev) setSlideIndex((prev) => prev - 1)
-            if (delta < -45 && canGoNext) setSlideIndex((prev) => prev + 1)
-            touchStartX.current = null
-          }}
-        >
-          <CardContent className="relative p-5">
-            <div className="mb-4 h-1.5 w-full overflow-hidden rounded-full bg-white/25">
-              <div className="h-full rounded-full bg-white transition-all duration-300" style={{ width: `${progress}%` }} />
-            </div>
-            <div className="mb-3 flex items-center justify-between text-white">
-              <div>
-                <p className="text-xs uppercase tracking-[0.2em] text-white/80">SignalLedger Wrapped</p>
-                <h2 className="text-2xl font-bold">{activeSlide.title}</h2>
-                <p className="text-sm text-white/85">{activeSlide.subtitle}</p>
-              </div>
-              <Sparkles className="h-6 w-6 animate-pulse" />
-            </div>
+      {!summaryLoading && selectedYear && activeSlide && (
+        <WrappedStoryCard
+          slide={activeSlide}
+          slideIndex={boundedSlideIndex}
+          slideCount={slides.length}
+          canGoPrev={canGoPrev}
+          canGoNext={canGoNext}
+          onPrev={goPrev}
+          onNext={goNext}
+          onJump={(index) => setSlideIndex(index)}
+          onTapAdvance={tapAdvance}
+          touchStartX={touchStartX}
+        />
+      )}
 
-            {activeSlide.body}
-
-            <div className="mt-5 flex items-center justify-between">
-              <Button variant="secondary" size="sm" onClick={() => canGoPrev && setSlideIndex((prev) => prev - 1)} disabled={!canGoPrev}>
-                <ChevronLeft className="mr-1 h-4 w-4" />
-                Prev
-              </Button>
-              <div className="flex gap-1">
-                {slides.map((slide, index) => (
-                  <button
-                    key={slide.id}
-                    onClick={() => setSlideIndex(index)}
-                    className={`h-2.5 w-2.5 rounded-full ${index === slideIndex ? 'bg-white' : 'bg-white/40'}`}
-                    aria-label={`Go to slide ${index + 1}`}
-                  />
-                ))}
-              </div>
-              <Button variant="secondary" size="sm" onClick={() => canGoNext && setSlideIndex((prev) => prev + 1)} disabled={!canGoNext}>
-                Next
-                <ChevronRight className="ml-1 h-4 w-4" />
+      {storyModeOpen && selectedYear && activeSlide && (
+        <div className="fixed inset-0 z-50 bg-black/85 p-3">
+          <div className="mx-auto flex h-full w-full max-w-md flex-col gap-3">
+            <div className="flex items-center justify-between rounded-xl bg-white/10 px-3 py-2 text-white">
+              <p className="text-sm font-semibold">{selectedYear} Wrapped Story Mode</p>
+              <Button variant="secondary" size="sm" onClick={() => setStoryModeOpen(false)}>
+                <X className="h-4 w-4" />
               </Button>
             </div>
-          </CardContent>
-        </Card>
+            <div className="flex-1">
+              <WrappedStoryCard
+                slide={activeSlide}
+                slideIndex={boundedSlideIndex}
+                slideCount={slides.length}
+                canGoPrev={canGoPrev}
+                canGoNext={canGoNext}
+                onPrev={goPrev}
+                onNext={goNext}
+                onJump={(index) => setSlideIndex(index)}
+                onTapAdvance={tapAdvance}
+                touchStartX={touchStartX}
+                fullScreen
+              />
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
