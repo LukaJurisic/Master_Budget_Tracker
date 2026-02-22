@@ -361,3 +361,17 @@
       - `/year-in-review` now included in `web/scripts/capture-mobile.mjs`
     - Fixed Year in Review API mismatch:
       - Removed dependency on missing `/analytics/transaction-counts` endpoint.
+  - Wrapped-style Year in Review v2:
+    - Fixed Cashflow Pulse chart rendering bug:
+      - Root cause: frontend expected `months/income_monthly/expense_monthly/savings_monthly`, but backend returns `income_vs_expenses` and `savings_by_month`.
+      - Updated data mapping in `web/src/pages/YearInReview.tsx` and `SummaryRange` typing in `web/src/lib/api.ts`.
+    - Added story-mode improvements:
+      - Auto-play toggle (5s slide cadence).
+      - Swipe gestures (left/right) for slide navigation.
+      - Story progress bar at top of wrapped card.
+    - Added richer insights:
+      - Peak income month.
+      - Strongest savings month.
+      - Savings rate callout.
+    - Added share action:
+      - `Share Highlights` using Web Share API, with clipboard fallback.

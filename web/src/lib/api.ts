@@ -289,16 +289,25 @@ export interface AvailableMonths {
 }
 
 export interface SummaryRange {
-  months: string[]
-  income_monthly: number[]
-  expense_monthly: number[]
-  savings_monthly: number[]
   income_total: number
   expense_total: number
   savings_total: number
   pct_saved: number
   income_avg: number
   expense_avg: number
+  income_vs_expenses: Array<{
+    month: string
+    income: number
+    expenses: number
+  }>
+  savings_by_month: Array<{
+    month: string
+    net_savings: number
+  }>
+  date_range: {
+    start_date: string
+    end_date: string
+  }
 }
 
 export interface CategorySeries {

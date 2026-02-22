@@ -105,11 +105,20 @@ function shortMonth(month: string) {
   return date.toLocaleString('en-CA', { month: 'short' })
 }
 
+function monthLabel(month: string) {
+  const year = Number.parseInt(month.slice(0, 4), 10)
+  const monthIndex = Number.parseInt(month.slice(5, 7), 10) - 1
+  const date = new Date(year, monthIndex, 1)
+  return date.toLocaleString('en-CA', { month: 'short', year: 'numeric' })
+}
+
 export default function YearInReview() {
   const [selectedYear, setSelectedYear] = useState<number | null>(null)
   const [slideIndex, setSlideIndex] = useState(0)
   const [musicOn, setMusicOn] = useState(false)
+  const [autoPlay, setAutoPlay] = useState(true)
   const { start, stop } = useWrappedSoundtrack()
+  const touchStartX = useRef<number | null>(null)
 
   const { data: availableMonths } = useQuery({
     queryKey: ['wrapped-available-months'],
@@ -146,6 +155,16 @@ export default function YearInReview() {
     setSlideIndex(0)
   }, [selectedYear])
 
+  useEffect(() => {
+    if (!autoPlay) return
+    const id = window.setInterval(() => {
+      setSlideIndex((prev) => (prev + 1) % 6)
+    }, 5000)
+    return () => {
+      window.clearInterval(id)
+    }
+  }, [autoPlay])
+
   const dateFrom = selectedYear ? `${selectedYear}-01-01` : ''
   const dateTo = selectedYear ? `${selectedYear}-12-31` : ''
   const enabled = !!selectedYear
@@ -169,24 +188,32 @@ export default function YearInReview() {
   })
 
   const chartData = useMemo(() => {
-    const months = summaryRange?.months ?? []
-    const income = summaryRange?.income_monthly ?? []
-    const expense = summaryRange?.expense_monthly ?? []
-    const savings = summaryRange?.savings_monthly ?? []
-    return months.map((month, index) => ({
-      month: shortMonth(month),
-      income: income[index] ?? 0,
-      expenses: expense[index] ?? 0,
-      savings: savings[index] ?? 0,
+    const flows = summaryRange?.income_vs_expenses ?? []
+    const savings = new Map((summaryRange?.savings_by_month ?? []).map((row) => [row.month, row.net_savings]))
+    return flows.map((row) => ({
+      month: shortMonth(row.month),
+      income: row.income ?? 0,
+      expenses: row.expenses ?? 0,
+      savings: savings.get(row.month) ?? 0,
     }))
-  }, [summaryRange?.expense_monthly, summaryRange?.income_monthly, summaryRange?.months, summaryRange?.savings_monthly])
+  }, [summaryRange?.income_vs_expenses, summaryRange?.savings_by_month])
 
   const topCategory = topCategories?.data?.[0]
   const topMerchant = topMerchants?.data?.[0]
   const peakSavings = useMemo(() => {
-    const values = summaryRange?.savings_monthly ?? []
+    const values = (summaryRange?.savings_by_month ?? []).map((row) => row.net_savings)
     return values.reduce((max, value) => Math.max(max, value), 0)
-  }, [summaryRange?.savings_monthly])
+  }, [summaryRange?.savings_by_month])
+  const peakIncomeMonth = useMemo(() => {
+    const flows = summaryRange?.income_vs_expenses ?? []
+    if (flows.length === 0) return null
+    return flows.reduce((best, row) => (row.income > best.income ? row : best), flows[0])
+  }, [summaryRange?.income_vs_expenses])
+  const strongestSavingsMonth = useMemo(() => {
+    const savings = summaryRange?.savings_by_month ?? []
+    if (savings.length === 0) return null
+    return savings.reduce((best, row) => (row.net_savings > best.net_savings ? row : best), savings[0])
+  }, [summaryRange?.savings_by_month])
 
   const slides = [
     {
@@ -219,9 +246,9 @@ export default function YearInReview() {
       accent: 'from-sky-500 via-blue-500 to-indigo-600',
       body: (
         <div className="space-y-3">
-          <div className="h-48 rounded-xl bg-white/10 p-2">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData}>
+            <div className="h-48 rounded-xl bg-white/10 p-2">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.2)" />
                 <XAxis dataKey="month" tick={{ fill: 'white', fontSize: 10 }} />
                 <YAxis tick={{ fill: 'white', fontSize: 10 }} />
@@ -229,9 +256,12 @@ export default function YearInReview() {
                 <Bar dataKey="income" fill="#34d399" radius={[4, 4, 0, 0]} />
                 <Bar dataKey="expenses" fill="#fb7185" radius={[4, 4, 0, 0]} />
                 <Bar dataKey="savings" fill="#a78bfa" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          {chartData.length === 0 && (
+            <p className="text-xs text-white/80">No monthly chart data for this year yet.</p>
+          )}
           <p className="text-xs text-white/80">
             Avg monthly income {formatCurrency(summaryRange?.income_avg ?? 0)} and spending {formatCurrency(summaryRange?.expense_avg ?? 0)}.
           </p>
@@ -287,6 +317,32 @@ export default function YearInReview() {
       ),
     },
     {
+      id: 'insights',
+      title: 'Headline Insights',
+      subtitle: 'Your standout moments this year',
+      accent: 'from-teal-500 via-blue-500 to-indigo-600',
+      body: (
+        <div className="space-y-3">
+          <div className="rounded-xl bg-white/15 p-3 backdrop-blur">
+            <p className="text-[11px] uppercase tracking-wide text-white/75">Peak income month</p>
+            <p className="mt-1 text-xl font-bold text-white">
+              {peakIncomeMonth ? `${monthLabel(peakIncomeMonth.month)} · ${formatCurrency(peakIncomeMonth.income)}` : 'No data'}
+            </p>
+          </div>
+          <div className="rounded-xl bg-white/15 p-3 backdrop-blur">
+            <p className="text-[11px] uppercase tracking-wide text-white/75">Strongest savings month</p>
+            <p className="mt-1 text-xl font-bold text-white">
+              {strongestSavingsMonth ? `${monthLabel(strongestSavingsMonth.month)} · ${formatCurrency(strongestSavingsMonth.net_savings)}` : 'No data'}
+            </p>
+          </div>
+          <div className="rounded-xl bg-white/15 p-3 backdrop-blur">
+            <p className="text-[11px] uppercase tracking-wide text-white/75">Savings rate</p>
+            <p className="mt-1 text-xl font-bold text-white">{(summaryRange?.pct_saved ?? 0).toFixed(1)}%</p>
+          </div>
+        </div>
+      ),
+    },
+    {
       id: 'finale',
       title: 'You Finished The Year',
       subtitle: 'Same data, new energy for next year',
@@ -312,6 +368,25 @@ export default function YearInReview() {
               <p className="text-[11px]">Growth</p>
             </div>
           </div>
+          <Button
+            variant="secondary"
+            size="sm"
+            className="w-full"
+            onClick={async () => {
+              const text = `My ${selectedYear} Wrapped: saved ${formatCurrency(summaryRange?.savings_total ?? 0)} on income ${formatCurrency(summaryRange?.income_total ?? 0)} in SignalLedger.`
+              if (navigator.share) {
+                try {
+                  await navigator.share({ title: `${selectedYear} Wrapped`, text })
+                } catch {
+                  // noop
+                }
+              } else {
+                await navigator.clipboard.writeText(text)
+              }
+            }}
+          >
+            Share Highlights
+          </Button>
         </div>
       ),
     },
@@ -320,6 +395,7 @@ export default function YearInReview() {
   const activeSlide = slides[slideIndex] ?? slides[0]
   const canGoPrev = slideIndex > 0
   const canGoNext = slideIndex < slides.length - 1
+  const progress = ((slideIndex + 1) / slides.length) * 100
 
   return (
     <div className="space-y-4">
@@ -355,6 +431,12 @@ export default function YearInReview() {
             </Button>
           ))}
         </div>
+        <div className="mt-3 flex items-center justify-between">
+          <p className="text-xs text-muted-foreground">Auto-play story mode</p>
+          <Button size="sm" variant={autoPlay ? 'default' : 'outline'} onClick={() => setAutoPlay((prev) => !prev)}>
+            {autoPlay ? 'On' : 'Off'}
+          </Button>
+        </div>
       </div>
 
       {summaryLoading && (
@@ -374,8 +456,25 @@ export default function YearInReview() {
       )}
 
       {!summaryLoading && selectedYear && (
-        <Card className={`relative overflow-hidden rounded-3xl border-0 bg-gradient-to-br ${activeSlide.accent}`}>
+        <Card
+          className={`relative overflow-hidden rounded-3xl border-0 bg-gradient-to-br ${activeSlide.accent}`}
+          onTouchStart={(event) => {
+            touchStartX.current = event.touches[0].clientX
+          }}
+          onTouchEnd={(event) => {
+            const startX = touchStartX.current
+            const endX = event.changedTouches[0].clientX
+            if (startX === null) return
+            const delta = endX - startX
+            if (delta > 45 && canGoPrev) setSlideIndex((prev) => prev - 1)
+            if (delta < -45 && canGoNext) setSlideIndex((prev) => prev + 1)
+            touchStartX.current = null
+          }}
+        >
           <CardContent className="relative p-5">
+            <div className="mb-4 h-1.5 w-full overflow-hidden rounded-full bg-white/25">
+              <div className="h-full rounded-full bg-white transition-all duration-300" style={{ width: `${progress}%` }} />
+            </div>
             <div className="mb-3 flex items-center justify-between text-white">
               <div>
                 <p className="text-xs uppercase tracking-[0.2em] text-white/80">SignalLedger Wrapped</p>
