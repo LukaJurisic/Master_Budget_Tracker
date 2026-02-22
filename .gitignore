@@ -71,6 +71,7 @@ temp/
 tmp/
 nul
 artifacts/mobile-bugs/
+artifacts/playwright/
 
 # Screenshots and debug images
 bugs.png/

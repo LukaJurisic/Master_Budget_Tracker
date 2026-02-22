@@ -61,6 +61,18 @@
 5. Confirm no errors for protected endpoints (`x-app-key` mismatch should not occur locally).
 6. Confirm local `DATABASE_URL` is unchanged.
 
+### Playwright Mobile Capture Loop (no ad hoc screenshots)
+- Install once:
+  - `cd web`
+  - `npm run pw:install`
+- Capture localhost mobile views + console/network issues:
+  - `npm run pw:mobile:localhost`
+- Capture production mobile views with throttled network:
+  - `npm run pw:mobile:prod`
+- Artifacts output:
+  - `artifacts/playwright/mobile/<timestamp>/`
+  - Includes per-page screenshots and `report.json`.
+
 ## Apple Review Guardrails (from cheat sheet validation logic)
 - Build readiness:
   - Attached build exists, not expired, processing state is `VALID`.
@@ -317,3 +329,15 @@
     - Workflow now expects Codemagic env group `signalledger_ios` with:
       - `VITE_API_URL` (Render backend URL)
       - `VITE_APP_KEY` (same as backend `APP_SHARED_KEY`)
+  - Playwright mobile capture loop added:
+    - Installed Playwright in `web` and Chromium runtime.
+    - Added script: `web/scripts/capture-mobile.mjs`
+    - Added npm scripts:
+      - `npm run pw:mobile:localhost`
+      - `npm run pw:mobile:prod`
+    - Output path:
+      - `artifacts/playwright/mobile/<timestamp>/` with screenshots + `report.json`.
+    - Initial run notes:
+      - Localhost run succeeded for all primary routes.
+      - Production run surfaced CORS failures on analytics endpoint:
+        - `https://master-budget-tracker.onrender.com/api/analytics/available-months`

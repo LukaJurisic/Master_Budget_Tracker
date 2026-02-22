@@ -16,6 +16,10 @@
     "cap:open:android": "npx cap open android",
     "cap:run:ios": "npx cap run ios",
     "cap:run:android": "npx cap run android",
+    "pw:install": "playwright install chromium",
+    "pw:mobile:capture": "node scripts/capture-mobile.mjs",
+    "pw:mobile:localhost": "node scripts/capture-mobile.mjs --base-url http://localhost:3000",
+    "pw:mobile:prod": "node scripts/capture-mobile.mjs --base-url https://www.signalledger.ca --throttle",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview"
   },
@@ -64,6 +68,7 @@
     "eslint": "^8.53.0",
     "eslint-plugin-react-hooks": "^4.6.0",
     "eslint-plugin-react-refresh": "^0.4.4",
+    "playwright": "^1.58.2",
     "postcss": "^8.4.31",
     "tailwindcss": "^3.3.5",
     "typescript": "^5.2.2",
