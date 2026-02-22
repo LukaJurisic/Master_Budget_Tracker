@@ -189,6 +189,19 @@
       - `artifacts/mobile-bugs/20260220-122848-analytics-recurring-mobile/screenshot.png`
 
 ## Next Milestone
+- iOS cloud build status (2026-02-22):
+  - `codemagic.yaml` validation issue was fixed (`integrations.app_store_connect` added).
+  - Current blocker is Apple signing assets:
+    - Codemagic error: `No matching profiles found for bundle identifier "com.lukajurisic.budgettracker" and distribution type "app_store"`.
+  - Root cause:
+    - Apple Developer account approval is still pending, so App Store distribution profile/cert setup is not complete yet.
+  - Resume checklist when Apple approval is active:
+    1. In Apple Developer, create/confirm App ID: `com.lukajurisic.budgettracker`.
+    2. Create Apple Distribution certificate.
+    3. Create App Store provisioning profile for the same bundle ID.
+    4. In Codemagic, import/select that certificate and provisioning profile.
+    5. Re-run `ios-testflight` workflow.
+
 - Android emulator loop (Windows):
   - `cd web`
   - If backend runs on `8020`:
