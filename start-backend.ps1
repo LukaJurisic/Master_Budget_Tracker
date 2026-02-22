@@ -10,12 +10,12 @@ try {
     $existing = Get-NetTCPConnection -LocalPort $Port -ErrorAction SilentlyContinue | Where-Object { $_.OwningProcess -gt 0 }
     if ($existing) {
         $pids = $existing | Select-Object -ExpandProperty OwningProcess | Sort-Object -Unique
-        foreach ($pid in $pids) {
+        foreach ($procId in $pids) {
             try {
-                Stop-Process -Id $pid -Force -ErrorAction Stop
-                Write-Host "Stopped process $pid holding port $Port" -ForegroundColor Yellow
+                Stop-Process -Id $procId -Force -ErrorAction Stop
+                Write-Host "Stopped process $procId holding port $Port" -ForegroundColor Yellow
             } catch {
-                Write-Warning "Failed to stop process ${pid}: $($_.Exception.Message)"
+                Write-Warning "Failed to stop process ${procId}: $($_.Exception.Message)"
             }
         }
         Start-Sleep -Milliseconds 500
