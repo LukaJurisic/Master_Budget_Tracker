@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { RefreshCw, AlertCircle } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { RefreshCw, AlertCircle, Play, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { apiClient, DashboardCards, DashboardLines, DashboardCategories, DashboardTopMerchant } from '@/lib/api'
@@ -171,6 +172,27 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       )}
+
+      <Card className="overflow-hidden border-0 bg-gradient-to-r from-sky-600 via-blue-600 to-cyan-500 text-white shadow-sm">
+        <CardContent className="p-4 sm:p-5">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-100">Story Mode</p>
+              <h3 className="mt-1 text-lg font-bold sm:text-xl">Your Year in Review is ready</h3>
+              <p className="mt-1 text-sm text-blue-100">
+                Open full-screen wrapped and tap through each chapter like a story.
+              </p>
+            </div>
+            <Sparkles className="h-5 w-5 shrink-0 text-blue-100" />
+          </div>
+          <Button asChild variant="secondary" className="mt-4 w-full sm:w-auto">
+            <Link to="/year-in-review?story=1">
+              <Play className="mr-2 h-4 w-4" />
+              View Your Wrapped
+            </Link>
+          </Button>
+        </CardContent>
+      </Card>
 
       {/* Metric Cards */}
       {safeCards && <CardsRow cards={safeCards} />}

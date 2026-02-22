@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { useSearchParams } from 'react-router-dom'
 import { BarChart, Bar, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts'
 import { ChevronLeft, ChevronRight, Expand, Landmark, Music2, Pause, Play, Sparkles, Trophy, Wallet, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -290,6 +291,7 @@ function WrappedStoryCard({
 }
 
 export default function YearInReview() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [selectedYear, setSelectedYear] = useState<number | null>(null)
   const [slideIndex, setSlideIndex] = useState(0)
   const [musicOn, setMusicOn] = useState(false)
@@ -298,6 +300,7 @@ export default function YearInReview() {
   const [isSharingCard, setIsSharingCard] = useState(false)
   const { start, stop } = useWrappedSoundtrack()
   const touchStartX = useRef<number | null>(null)
+  const shouldAutoOpenStory = searchParams.get('story') === '1'
 
   const { data: availableMonths } = useQuery({
     queryKey: ['wrapped-available-months'],
@@ -343,6 +346,11 @@ export default function YearInReview() {
   useEffect(() => {
     setSlideIndex(0)
   }, [selectedYear])
+
+  useEffect(() => {
+    if (!selectedYear || !shouldAutoOpenStory) return
+    setStoryModeOpen(true)
+  }, [selectedYear, shouldAutoOpenStory])
 
   const dateFrom = selectedYear ? `${selectedYear}-01-01` : ''
   const dateTo = selectedYear ? `${selectedYear}-12-31` : ''
@@ -656,6 +664,14 @@ export default function YearInReview() {
     setSlideIndex(0)
   }
 
+  const closeStoryMode = () => {
+    setStoryModeOpen(false)
+    if (!shouldAutoOpenStory) return
+    const nextParams = new URLSearchParams(searchParams)
+    nextParams.delete('story')
+    setSearchParams(nextParams, { replace: true })
+  }
+
   return (
     <div className="space-y-4">
       <div className="rounded-2xl border bg-white p-4">
@@ -734,7 +750,7 @@ export default function YearInReview() {
           <div className="mx-auto flex h-full w-full max-w-md flex-col gap-3">
             <div className="flex items-center justify-between rounded-xl bg-white/10 px-3 py-2 text-white">
               <p className="text-sm font-semibold">{selectedYear} Wrapped Story Mode</p>
-              <Button variant="secondary" size="sm" onClick={() => setStoryModeOpen(false)}>
+              <Button variant="secondary" size="sm" onClick={closeStoryMode}>
                 <X className="h-4 w-4" />
               </Button>
             </div>

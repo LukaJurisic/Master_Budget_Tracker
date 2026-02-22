@@ -112,6 +112,17 @@
   - `asc submit create --app "<APP_ID>" --version "<VERSION>" --build "<BUILD_ID>" --confirm`
 
 ## Build Log
+- 2026-02-22 (Wrapped launch flow update):
+  - Removed `Wrapped` from bottom mobile tab bar in `web/src/App.tsx`.
+  - Added dashboard CTA card in `web/src/pages/Dashboard.tsx`:
+    - `View Your Wrapped` now launches `'/year-in-review?story=1'`.
+  - Updated `web/src/pages/YearInReview.tsx`:
+    - Auto-opens full-screen story mode when `?story=1` is present.
+    - Keeps tap/swipe progression mechanics for quick chapter skipping.
+    - Closing story mode clears the `story` query param.
+  - Validation captures:
+    - `artifacts/playwright/mobile/2026-02-22T21-24-28-217Z/home.png`
+    - `web/artifacts/playwright/mobile/manual/wrapped-story-launch.png`
 - 2026-02-20:
   - Created `mobile` branch.
   - Added `mobile.md`.

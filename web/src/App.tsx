@@ -52,7 +52,6 @@ const mobileNavigation = [
   { name: 'Txns', href: '/transactions', icon: CreditCard },
   { name: 'Map', href: '/mapping', icon: Settings },
   { name: 'Budgets', href: '/budgets', icon: Target },
-  { name: 'Wrapped', href: '/year-in-review', icon: Sparkles },
   { name: 'More', href: '/sources', icon: MoreHorizontal },
 ]
 
