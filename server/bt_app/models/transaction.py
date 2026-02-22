@@ -47,7 +47,6 @@ class Transaction(BaseModel):
     __table_args__ = (
         UniqueConstraint('account_id', 'posted_date', 'amount', 'hash_dedupe', name='_transaction_dedupe_uc'),
         Index('ix_transactions_unmapped', 'merchant_norm', 'category_id'),
-        Index('ix_transactions_external_id', 'external_id'),
         Index('ix_transactions_import_id', 'import_id'),
     )
     
